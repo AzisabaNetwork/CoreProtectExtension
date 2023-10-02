@@ -16,7 +16,7 @@ data class ContainerLookupResult(
     val z: Int,
     val type: Material,
     val amount: Int,
-    val metadata: ByteArray,
+    val metadata: ByteArray?,
     val action: Action,
     val rolledBack: Boolean,
 ) {
