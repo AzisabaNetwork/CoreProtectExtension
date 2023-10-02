@@ -1,0 +1,10 @@
+name: CoreProtectExtension
+version: @version@
+main: net.azisaba.coreprotectextension.CoreProtectExtension
+api-version: 1.13
+depend:
+  - CoreProtect
+commands:
+  cpe:
+    permission: coreprotectextension.command
+    aliases: [coe]
