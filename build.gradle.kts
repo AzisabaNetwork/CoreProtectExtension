@@ -17,7 +17,6 @@ java {
 }
 
 repositories {
-    mavenLocal()
     mavenCentral()
     maven {
         name = "papermc-repo"
@@ -28,13 +27,6 @@ repositories {
         url = uri("https://repo.azisaba.net/repository/maven-public/")
     }
     maven { url = uri("https://maven.playpro.com/") }
-    if (properties["azisabaNmsUsername"] != null && properties["azisabaNmsPassword"] != null) {
-        maven {
-            name = "azisabaNms"
-            credentials(PasswordCredentials::class)
-            url = uri("https://repo.azisaba.net/repository/nms/")
-        }
-    }
 }
 
 dependencies {
@@ -42,9 +34,8 @@ dependencies {
     implementation("org.yaml:snakeyaml:2.2")
     implementation("xyz.acrylicstyle.java-util:common:2.0.0-SNAPSHOT")
     implementation("xyz.acrylicstyle.java-util:reflector:2.0.0-SNAPSHOT")
-    //noinspection VulnerableLibrariesLocal
+    @Suppress("VulnerableLibrariesLocal", "RedundantSuppression")
     compileOnly("com.destroystokyo.paper:paper-api:1.15.2-R0.1-SNAPSHOT")
-    compileOnly("org.spigotmc:spigot:1.15.2-R0.1-SNAPSHOT")
     compileOnly("net.coreprotect:coreprotect:22.2")
     testImplementation(kotlin("test"))
 }
