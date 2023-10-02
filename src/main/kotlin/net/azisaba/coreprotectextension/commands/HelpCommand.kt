@@ -21,11 +21,11 @@ class HelpCommand(private val commandManager: CommandManager) : Command {
         names.add(0, command.name)
         sender.sendMessage("${ChatColor.GOLD}Name(s): ${ChatColor.AQUA}${names.joinToString(", ")}")
         sender.sendMessage("${ChatColor.GOLD}Summary: ${ChatColor.AQUA}${command.summary}")
-        if (summary != description) {
+        if (command.summary != command.description) {
             sender.sendMessage("${ChatColor.GOLD}Description:")
-            sender.sendMessage(" ${ChatColor.AQUA} " + description.replace("\n", " "))
+            sender.sendMessage(" ${ChatColor.AQUA} " + command.description.replace("\n", " "))
         }
-        sender.sendMessage("${ChatColor.GOLD}Usage: ${ChatColor.AQUA}$fullUsage")
+        sender.sendMessage("${ChatColor.GOLD}Usage: ${ChatColor.AQUA}${command.fullUsage}")
     }
 
     override fun suggest(sender: CommandSender, args: Array<String>): List<String> {
