@@ -1,8 +1,8 @@
 package net.azisaba.coreprotectextension.commands
 
 import net.azisaba.coreprotectextension.database.CPDatabase
-import org.bukkit.ChatColor
 import org.bukkit.command.CommandSender
+import org.bukkit.ChatColor as C
 
 object SQLQueryCommand : Command {
     override val name = "sql-query"
@@ -15,22 +15,21 @@ object SQLQueryCommand : Command {
             conn.createStatement().use { statement ->
                 statement.executeQuery(sql).use { rs ->
                     var resultCount = 0
-                    val labels = (1..rs.metaData.columnCount).map { rs.metaData.getColumnLabel(it) }
+                    val labels = (1..rs.metaData.columnCount).map { "${rs.metaData.getColumnLabel(it)}[${rs.metaData.getColumnTypeName(it)}]" }
                     while (rs.next()) {
-                        if (resultCount++ < 5) {
-                            sender.sendMessage("${ChatColor.WHITE}---------- ${ChatColor.WHITE}Row${ChatColor.AQUA}#$resultCount ${ChatColor.GRAY}-----------")
-                            labels.forEach { label ->
-                                sender.sendMessage("${ChatColor.GOLD}$label ${ChatColor.GRAY}= ${ChatColor.WHITE}${rs.getObject(label)}")
+                        if (resultCount++ < 50) {
+                            labels.forEachIndexed { index, label ->
+                                sender.sendMessage("${C.GOLD}$label ${C.GRAY}of ${C.AQUA}#$resultCount ${C.GRAY}= ${C.WHITE}${rs.getObject(index + 1)}")
                             }
                         }
                     }
-                    if (resultCount > 5) {
-                        sender.sendMessage("${ChatColor.GRAY}(${resultCount - 5} more rows...)")
+                    if (resultCount > 50) {
+                        sender.sendMessage("${C.GRAY}(${resultCount - 50} more results...)")
                     }
                 }
             }
         } ?: run {
-            sender.sendMessage("${ChatColor.RED}Failed to obtain database connection.")
+            sender.sendMessage("${C.RED}Failed to obtain database connection.")
         }
     }
 }
