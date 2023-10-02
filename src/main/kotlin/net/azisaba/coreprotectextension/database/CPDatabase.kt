@@ -5,6 +5,7 @@ package net.azisaba.coreprotectextension.database
 import net.azisaba.coreprotectextension.config.PluginConfig
 import net.azisaba.coreprotectextension.model.User
 import net.azisaba.coreprotectextension.result.ContainerLookupResult
+import net.azisaba.coreprotectextension.util.Util.toInstant
 import net.coreprotect.config.ConfigHandler
 import net.coreprotect.database.Database
 import net.coreprotect.utility.Util
@@ -67,13 +68,19 @@ object CPDatabase {
         }
     }
 
-    fun lookupContainer(origin: Location?, user: String?, before: LocalDateTime?, after: LocalDateTime?, radius: Int?, page: Int = 0): List<ContainerLookupResult> {
+    fun lookupContainer(origin: Location?, user: String?, after: Instant?, before: Instant?, radius: Int?, page: Int = 0): List<ContainerLookupResult> {
         val userId = user?.let { getUserByName(it)?.id }
         val queryBuilder = QueryBuilder("SELECT * FROM `${ConfigHandler.prefix}container`", suffix = "LIMIT 5 OFFSET ${max(0, page) * 5}")
         queryBuilder.addWhereIfNotNull("`user` = ?", userId)
         if (origin != null && radius != null) {
             queryBuilder.addWhere("abs(x - ?) <= ?", origin.blockX, radius)
             queryBuilder.addWhere("abs(z - ?) <= ?", origin.blockZ, radius)
+        }
+        if (after != null) {
+            queryBuilder.addWhere("time > ?", after.epochSecond)
+        }
+        if (before != null) {
+            queryBuilder.addWhere("time < ?", before.epochSecond)
         }
         val list = mutableListOf<ContainerLookupResult>()
         queryBuilder.executeQuery { rs ->

@@ -2,6 +2,7 @@ package net.azisaba.coreprotectextension.commands
 
 import net.azisaba.coreprotectextension.CoreProtectExtension
 import net.azisaba.coreprotectextension.database.CPDatabase
+import net.azisaba.coreprotectextension.util.Util
 import net.azisaba.coreprotectextension.util.Util.getSNBT
 import net.azisaba.coreprotectextension.util.Util.getTimeSince
 import net.azisaba.coreprotectextension.util.Util.toComponent
@@ -16,6 +17,7 @@ import org.bukkit.entity.Player
 import xyz.acrylicstyle.util.ArgumentParserBuilder
 import xyz.acrylicstyle.util.InvalidArgumentException
 import java.text.SimpleDateFormat
+import java.time.Instant
 import java.time.LocalDateTime
 import kotlin.math.max
 
@@ -30,7 +32,7 @@ class LookupContainerCommand(private val plugin: CoreProtectExtension) : Command
             .create()
     override val name = "lookup-container"
     override val usage = listOf("<params>")
-    private val params = listOf("user=", "radius=", "page=")
+    private val params = listOf("user=", "radius=", "page=", "before=", "after=")
 
     override fun execute(sender: CommandSender, args: Array<String>) {
         if (sender !is Player) {
@@ -45,9 +47,23 @@ class LookupContainerCommand(private val plugin: CoreProtectExtension) : Command
         val argUser = arguments.getArgument("user")
         val argRadius = arguments.getArgument("radius")?.toInt()
         val argPage = max(1, arguments.getArgument("page")?.toInt() ?: 1) - 1
+        val after = arguments.getArgument("after")?.let {
+            try {
+                System.currentTimeMillis() - Util.processTime(it)
+            } catch (e: Exception) {
+                Util.parseDateTime(it)
+            }
+        }?.let { Instant.ofEpochMilli(it) }
+        val before = arguments.getArgument("before")?.let {
+            try {
+                System.currentTimeMillis() - Util.processTime(it)
+            } catch (e: Exception) {
+                Util.parseDateTime(it)
+            }
+        }?.let { Instant.ofEpochMilli(it) }
         Bukkit.getScheduler().runTaskAsynchronously(plugin, Runnable {
             val list = try {
-                CPDatabase.lookupContainer(sender.location, argUser, null, null, argRadius, argPage).reversed()
+                CPDatabase.lookupContainer(sender.location, argUser, after, before, argRadius, argPage).reversed()
             } catch (e: Exception) {
                 sender.sendMessage("${ChatColor.RED}An error occurred while executing command.")
                 plugin.slF4JLogger.error("Failed to execute command from ${sender.name}: /cpe lookup-container ${args.joinToString(" ")}", e)
@@ -85,6 +101,8 @@ class LookupContainerCommand(private val plugin: CoreProtectExtension) : Command
             var commandWithoutPage = "/cpe lookup-container "
             argUser?.let { commandWithoutPage += "user=$it " }
             argRadius?.let { commandWithoutPage += "radius=$it " }
+            before?.let { commandWithoutPage += "before=\"${dateFormat.format(it.toEpochMilli())}\"" }
+            after?.let { commandWithoutPage += "after=\"${dateFormat.format(it.toEpochMilli())}\"" }
             val back = TextComponent("<< ")
             if (argPage > 0) {
                 back.hoverEvent = HoverEvent(HoverEvent.Action.SHOW_TEXT, TextComponent.fromLegacyText("<< Previous page"))
