@@ -110,10 +110,10 @@ class LookupContainerCommand(private val plugin: CoreProtectExtension) : Command
     override fun suggest(sender: CommandSender, args: Array<String>): List<String> {
         if (args.isEmpty()) return emptyList()
         if (args.last().startsWith("user=")) {
-            return Bukkit.getOnlinePlayers().map { it.name }.map { "user=$it" }.filter { it.startsWith(args[0], true) }
+            return Bukkit.getOnlinePlayers().map { it.name }.map { "user=$it" }.filter { it.startsWith(args.last(), true) }
         }
         if (args.last().startsWith("radius=")) {
-            return (0..100).map { "radius=$it" }.filter { it.startsWith(args[0], true) }
+            return (0..100).map { "radius=$it" }.filter { it.startsWith(args.last(), true) }
         }
         return params.filter { param -> args.all { arg -> !arg.startsWith(param) } }.filter { it.startsWith(args.last()) }
     }
