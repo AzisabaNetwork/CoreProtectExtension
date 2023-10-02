@@ -40,7 +40,8 @@ repositories {
 dependencies {
     implementation("com.charleskorn.kaml:kaml:0.55.0")
     implementation("org.yaml:snakeyaml:2.2")
-    implementation("xyz.acrylicstyle.java-util:serialization:2.0.0-SNAPSHOT")
+    implementation("xyz.acrylicstyle.java-util:common:2.0.0-SNAPSHOT")
+    implementation("xyz.acrylicstyle.java-util:reflector:2.0.0-SNAPSHOT")
     //noinspection VulnerableLibrariesLocal
     compileOnly("com.destroystokyo.paper:paper-api:1.15.2-R0.1-SNAPSHOT")
     compileOnly("org.spigotmc:spigot:1.15.2-R0.1-SNAPSHOT")
