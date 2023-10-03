@@ -10,6 +10,7 @@ import org.bukkit.Bukkit
 import org.bukkit.ChatColor
 import org.bukkit.entity.Player
 import org.bukkit.inventory.ItemStack
+import org.bukkit.plugin.Plugin
 import xyz.acrylicstyle.util.InvalidArgumentException
 import xyz.acrylicstyle.util.StringReader
 import java.text.DecimalFormat
@@ -18,6 +19,8 @@ import java.text.SimpleDateFormat
 import java.time.Instant
 import java.time.LocalDateTime
 import java.util.*
+import java.util.concurrent.CompletableFuture
+import java.util.concurrent.Executor
 import kotlin.math.max
 import kotlin.math.min
 
@@ -244,4 +247,11 @@ object Util {
         navigation.addExtra(current)
         sender.spigot().sendMessage(navigation)
     }
+
+    fun <R> runInMain(plugin: Plugin, action: () -> R): R =
+        if (Bukkit.isPrimaryThread()) {
+            action()
+        } else {
+            CompletableFuture.supplyAsync(action) { Bukkit.getScheduler().runTask(plugin, it) }.join()
+        }
 }

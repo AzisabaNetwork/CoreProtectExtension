@@ -7,6 +7,8 @@ import net.azisaba.coreprotectextension.util.Util.toComponent
 import org.bukkit.Bukkit
 import org.bukkit.ChatColor
 import org.bukkit.Location
+import org.bukkit.block.Chest
+import org.bukkit.block.DoubleChest
 import org.bukkit.command.CommandSender
 import org.bukkit.entity.Player
 import xyz.acrylicstyle.util.ArgumentParserBuilder
@@ -48,14 +50,47 @@ class InspectCommand(private val plugin: CoreProtectExtension) : Command {
                 null
             }
         } ?: return toggleInspectMode(sender)
-        if (location.distance(sender.location) > 5) return toggleInspectMode(sender)
+        if (location.distance(sender.location) > 5 && !sender.hasPermission("coreprotectextension.command.inspect.far")) {
+            return sender.sendActionBar("${ChatColor.RED}You are too far from provided location.")
+        }
         Bukkit.getScheduler().runTaskAsynchronously(plugin, Runnable {
-            val list = try {
+            var list = try {
                 CPDatabase.lookupContainer(location, null, null, null, -1, argPage, resultsPerPage = 10).reversed()
             } catch (e: Exception) {
                 sender.sendMessage("${ChatColor.RED}An error occurred while executing command.")
                 plugin.slF4JLogger.error("Failed to execute command from ${sender.name}: /cpe inspect ${args.joinToString(" ")}", e)
                 return@Runnable
+            }
+            if (list.isEmpty()) {
+                Util.runInMain(plugin) {
+                    location.block
+                        .state
+                        .let { it as? Chest }
+                        ?.inventory
+                        ?.holder
+                        ?.let { it as? DoubleChest }
+                        ?.let {
+                            val leftLocation = (it.leftSide as? Chest)?.location
+                            val rightLocation = (it.rightSide as? Chest)?.location
+                            if (rightLocation != null && leftLocation?.blockX == location.blockX && leftLocation.blockY == location.blockY && leftLocation.blockZ == location.blockZ) {
+                                rightLocation
+                            } else if (leftLocation != null && rightLocation?.blockX == location.blockX && rightLocation.blockY == location.blockY && rightLocation.blockZ == location.blockZ) {
+                                leftLocation
+                            } else {
+                                null
+                            }
+                        }
+                }?.run {
+                    list = try {
+                        CPDatabase.lookupContainer(this, null, null, null, -1, argPage, resultsPerPage = 10).reversed()
+                    } catch (e: Exception) {
+                        sender.sendMessage("${ChatColor.RED}An error occurred while executing command.")
+                        plugin.slF4JLogger.error(
+                            "Failed to execute command from ${sender.name}: /cpe inspect ${args.joinToString(" ")}", e
+                        )
+                        return@run
+                    }
+                }
             }
             if (getItem != null) {
                 if (sender.hasPermission("coreprotectextension.command.inspect.get-item")) {
