@@ -33,7 +33,9 @@ class CommandManager(private val plugin: CoreProtectExtension) : TabExecutor {
         try {
             if (args.isEmpty()) {
                 commands.values.distinct().sortedBy { it.name }.forEach { cmd ->
-                    sender.sendMessage("${ChatColor.GOLD}${cmd.fullUsage} ${ChatColor.GRAY}- ${ChatColor.AQUA}${cmd.summary}")
+                    if (sender.hasPermission("coreprotectextension.command.${cmd.name}")) {
+                        sender.sendMessage("${ChatColor.GOLD}${cmd.fullUsage} ${ChatColor.GRAY}- ${ChatColor.AQUA}${cmd.summary}")
+                    }
                 }
                 return true
             }
