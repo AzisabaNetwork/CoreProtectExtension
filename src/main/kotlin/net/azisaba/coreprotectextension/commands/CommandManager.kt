@@ -21,6 +21,9 @@ class CommandManager(private val plugin: CoreProtectExtension) : TabExecutor {
         }
     }
 
+    internal inline fun <reified T : Command> getCommandOfType() =
+        commands.values.filterIsInstance<T>().firstOrNull() ?: error("${T::class.java.name} is not registered")
+
     override fun onCommand(
         sender: CommandSender,
         command: org.bukkit.command.Command,
@@ -79,5 +82,6 @@ class CommandManager(private val plugin: CoreProtectExtension) : TabExecutor {
         registerCommand(SQLQueryCommand)
         registerCommand(LookupContainerCommand(plugin))
         registerCommand(ClearCacheCommand)
+        registerCommand(InspectCommand(plugin))
     }
 }

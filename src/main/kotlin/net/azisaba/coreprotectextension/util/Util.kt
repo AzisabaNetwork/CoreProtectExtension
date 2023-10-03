@@ -1,9 +1,14 @@
 package net.azisaba.coreprotectextension.util
 
 import net.azisaba.coreprotectextension.config.PluginConfig
+import net.azisaba.coreprotectextension.database.CPDatabase
+import net.azisaba.coreprotectextension.result.ContainerLookupResult
+import net.md_5.bungee.api.chat.ClickEvent
+import net.md_5.bungee.api.chat.HoverEvent
 import net.md_5.bungee.api.chat.TextComponent
 import org.bukkit.Bukkit
 import org.bukkit.ChatColor
+import org.bukkit.entity.Player
 import org.bukkit.inventory.ItemStack
 import xyz.acrylicstyle.util.InvalidArgumentException
 import xyz.acrylicstyle.util.StringReader
@@ -171,5 +176,72 @@ object Util {
             ?: error("Could not find tag field")
         tagField.isAccessible = true
         return tagField.get(nms)?.toString()
+    }
+
+    fun sendResults(sender: Player, list: List<ContainerLookupResult>, commandWithoutPage: String, pageIndex: Int, showLocation: Boolean = true, resultsPerPage: Int = 5) {
+        val now = LocalDateTime.now()
+        sender.sendMessage("----------------------------------------")
+        list.forEachIndexed { index, result ->
+            val text = TextComponent()
+            val time = TextComponent("${result.time.getTimeSince(now)} ago ")
+                .apply { color = ChatColor.GRAY.asBungee() }
+            time.hoverEvent = HoverEvent(HoverEvent.Action.SHOW_TEXT, TextComponent.fromLegacyText(formats[0].format(result.time.toInstant().toEpochMilli())))
+            val user = TextComponent("${result.user.name} ").apply { color = ChatColor.GOLD.asBungee() }
+            user.hoverEvent = HoverEvent(HoverEvent.Action.SHOW_TEXT, TextComponent.fromLegacyText(result.user.uuid.toString()))
+            val item = TextComponent(result.type.name.lowercase()).apply { color = ChatColor.AQUA.asBungee() }
+            val itemStack = result.getItemStack()
+            val tag = "{\"id\":\"minecraft:${result.type.name.lowercase()}\",Count:${result.amount},tag:${itemStack.getSNBT()}}"
+            if (tag.toByteArray().size < 260000) {
+                item.hoverEvent = HoverEvent(HoverEvent.Action.SHOW_ITEM, arrayOf(TextComponent(tag)))
+            } else if (itemStack.itemMeta?.hasDisplayName() == true) {
+                item.hoverEvent = HoverEvent(
+                    HoverEvent.Action.SHOW_TEXT, TextComponent.fromLegacyText(
+                    itemStack.itemMeta!!.displayName + "\n§7§o(Item data is too big to be shown)\n" +
+                            "§7§o(You can click here to obtain the actual item, but you do so at §c§oyour own risk§7§o)"
+                ))
+            } else {
+                item.hoverEvent = HoverEvent(
+                    HoverEvent.Action.SHOW_TEXT, TextComponent.fromLegacyText(
+                    "§7§o(Item data is too big to be shown)\n" +
+                            "§7§o(You can click here to obtain the actual item, but you do so at §c§oyour own risk§7§o)"
+                ))
+            }
+            item.clickEvent = ClickEvent(ClickEvent.Action.RUN_COMMAND, "$commandWithoutPage page=${pageIndex + 1} getitemindex=${index}")
+            text.addExtra(time)
+            text.addExtra(user)
+            text.addExtra("§${result.action.color}${result.action.short}${result.amount} ")
+            text.addExtra(item)
+            sender.spigot().sendMessage(text)
+            if (showLocation) {
+                val location = TextComponent(
+                    " §r §r §r §r §r §r §r §r §r §r §r §r §r §r §7 ^ §o(x${result.x}/y${result.y}/z${result.z}/${CPDatabase.getWorldName(result.worldId)})"
+                )
+                location.clickEvent = ClickEvent(
+                    ClickEvent.Action.RUN_COMMAND,
+                    "/co teleport wid:${result.worldId} ${result.x + 0.5} ${result.y} ${result.z + 0.5}",
+                )
+                sender.spigot().sendMessage(location)
+            }
+        }
+        val navigation = TextComponent()
+        val back = TextComponent("<< ")
+        if (pageIndex > 0) {
+            back.hoverEvent = HoverEvent(HoverEvent.Action.SHOW_TEXT, TextComponent.fromLegacyText("<< Previous page"))
+            back.clickEvent = ClickEvent(ClickEvent.Action.RUN_COMMAND, "$commandWithoutPage page=$pageIndex")
+        } else {
+            back.color = ChatColor.DARK_GRAY.asBungee()
+        }
+        val next = TextComponent(" >>")
+        if (list.size == resultsPerPage) {
+            next.hoverEvent = HoverEvent(HoverEvent.Action.SHOW_TEXT, TextComponent.fromLegacyText("Next page >>"))
+            next.clickEvent = ClickEvent(ClickEvent.Action.RUN_COMMAND, "$commandWithoutPage page=${pageIndex + 2}")
+        } else {
+            next.color = ChatColor.DARK_GRAY.asBungee()
+        }
+        val current = TextComponent(" ${ChatColor.GRAY}| ${ChatColor.WHITE}Page ${ChatColor.AQUA}${pageIndex + 1}")
+        navigation.addExtra(back)
+        navigation.addExtra(next)
+        navigation.addExtra(current)
+        sender.spigot().sendMessage(navigation)
     }
 }

@@ -111,10 +111,11 @@ object CPDatabase {
         before: Instant?,
         radius: Int?,
         page: Int = 0,
+        resultsPerPage: Int = 5,
     ): List<ContainerLookupResult> {
         val userId = user?.let { getUserByName(it)?.id }
         val wid = origin?.let { getWorldId(it.world.name) }
-        val queryBuilder = QueryBuilder("SELECT * FROM `${ConfigHandler.prefix}container`", suffix = "LIMIT 5 OFFSET ${max(0, page) * 5}")
+        val queryBuilder = QueryBuilder("SELECT * FROM `${ConfigHandler.prefix}container`", suffix = "LIMIT $resultsPerPage OFFSET ${max(0, page) * resultsPerPage}")
         queryBuilder.addWhereIfNotNull("user = ?", userId)
         if (origin != null && radius != null && radius >= 0) {
             queryBuilder.addWhere("wid = ?", wid)
