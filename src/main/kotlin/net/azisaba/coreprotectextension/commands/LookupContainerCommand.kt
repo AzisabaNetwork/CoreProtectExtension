@@ -12,6 +12,7 @@ import net.md_5.bungee.api.chat.HoverEvent
 import net.md_5.bungee.api.chat.TextComponent
 import org.bukkit.Bukkit
 import org.bukkit.ChatColor
+import org.bukkit.Location
 import org.bukkit.command.CommandSender
 import org.bukkit.entity.Player
 import xyz.acrylicstyle.util.ArgumentParserBuilder
@@ -22,6 +23,9 @@ import java.time.LocalDateTime
 import kotlin.math.max
 
 class LookupContainerCommand(private val plugin: CoreProtectExtension) : Command {
+    override val name = "lookup-container"
+    override val usage = listOf("<params>")
+    private val params = listOf("user=", "radius=", "page=", "before=", "after=")
     private val dateFormat = SimpleDateFormat("yyyy/MM/dd HH:mm:ss Z")
     private val parser =
         ArgumentParserBuilder.builder()
@@ -30,9 +34,6 @@ class LookupContainerCommand(private val plugin: CoreProtectExtension) : Command
             .disallowEscapedLineTerminators()
             .literalBackslash()
             .create()
-    override val name = "lookup-container"
-    override val usage = listOf("<params>")
-    private val params = listOf("user=", "radius=", "page=", "before=", "after=")
 
     override fun execute(sender: CommandSender, args: Array<String>) {
         if (sender !is Player) {
@@ -87,7 +88,7 @@ class LookupContainerCommand(private val plugin: CoreProtectExtension) : Command
                 val item = TextComponent(result.type.name.lowercase()).apply { color = ChatColor.AQUA.asBungee() }
                 val itemStack = result.getItemStack()
                 val tag = "{\"id\":\"minecraft:${result.type.name.lowercase()}\",Count:${result.amount},tag:${itemStack.getSNBT()}}"
-                if (tag.length < 262144) {
+                if (tag.toByteArray().size < 260000) {
                     item.hoverEvent = HoverEvent(HoverEvent.Action.SHOW_ITEM, arrayOf(TextComponent(tag)))
                 } else if (itemStack.itemMeta?.hasDisplayName() == true) {
                     item.hoverEvent = HoverEvent(HoverEvent.Action.SHOW_TEXT, TextComponent.fromLegacyText(
