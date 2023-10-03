@@ -91,12 +91,13 @@ class LookupContainerCommand(private val plugin: CoreProtectExtension) : Command
                     item.hoverEvent = HoverEvent(HoverEvent.Action.SHOW_ITEM, arrayOf(TextComponent(tag)))
                 } else if (itemStack.itemMeta?.hasDisplayName() == true) {
                     item.hoverEvent = HoverEvent(HoverEvent.Action.SHOW_TEXT, TextComponent.fromLegacyText(
-                        itemStack.itemMeta!!.displayName + "\n§o(Item data is too big to be shown)\n" +
-                                "§o(You can click here to obtain the actual item, but you do so at your own risk)"
+                        itemStack.itemMeta!!.displayName + "\n§7§o(Item data is too big to be shown)\n" +
+                                "§7§o(You can click here to obtain the actual item, but you do so at §c§oyour own risk§7§o)"
                     ))
                 } else {
                     item.hoverEvent = HoverEvent(HoverEvent.Action.SHOW_TEXT, TextComponent.fromLegacyText(
-                        "§o(Item data is too big to be shown)\n§o(You can click here to obtain the actual item, but you do so at your own risk)"
+                        "§7§o(Item data is too big to be shown)\n" +
+                                "§7§o(You can click here to obtain the actual item, but you do so at §c§oyour own risk§7§o)"
                     ))
                 }
                 item.clickEvent = ClickEvent(ClickEvent.Action.RUN_COMMAND, "/cpe lookup-container ${args.joinToString(" ")} getitemindex=${index}")
