@@ -1,13 +1,12 @@
-package net.azisaba.coreprotectextension.result
+package net.azisaba.coreprotectextension.model
 
-import net.azisaba.coreprotectextension.model.User
 import net.coreprotect.database.Rollback
 import org.bukkit.Material
 import org.bukkit.inventory.ItemStack
 import java.time.LocalDateTime
 
 @Suppress("ArrayInDataClass")
-data class ContainerLookupResult(
+data class ContainerLog(
     val time: LocalDateTime,
     val user: User,
     val worldId: Int,

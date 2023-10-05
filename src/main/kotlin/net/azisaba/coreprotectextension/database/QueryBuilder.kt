@@ -1,8 +1,9 @@
 package net.azisaba.coreprotectextension.database
 
+import org.intellij.lang.annotations.Language
 import java.sql.ResultSet
 
-class QueryBuilder(private val sql: String, vararg values: Any?, private val suffix: String = "") {
+class QueryBuilder(@Language("SQL") var sql: String, vararg values: Any?, var suffix: String = "") {
     private val values = values.toMutableList()
     private val where = mutableListOf<String>()
 

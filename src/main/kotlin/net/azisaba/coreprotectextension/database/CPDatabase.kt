@@ -4,7 +4,8 @@ package net.azisaba.coreprotectextension.database
 
 import net.azisaba.coreprotectextension.config.PluginConfig
 import net.azisaba.coreprotectextension.model.User
-import net.azisaba.coreprotectextension.result.ContainerLookupResult
+import net.azisaba.coreprotectextension.model.ContainerLog
+import net.azisaba.coreprotectextension.model.ContainerLookupResult
 import net.coreprotect.config.ConfigHandler
 import net.coreprotect.database.Database
 import net.coreprotect.utility.Util
@@ -112,10 +113,13 @@ object CPDatabase {
         radius: Int?,
         page: Int = 0,
         resultsPerPage: Int = 5,
-    ): List<ContainerLookupResult> {
+    ): ContainerLookupResult {
         val userId = user?.let { getUserByName(it)?.id }
         val wid = origin?.let { getWorldId(it.world.name) }
-        val queryBuilder = QueryBuilder("SELECT * FROM `${ConfigHandler.prefix}container`", suffix = "LIMIT $resultsPerPage OFFSET ${max(0, page) * resultsPerPage}")
+        val queryBuilder = QueryBuilder(
+            "SELECT * FROM `${ConfigHandler.prefix}container`",
+            suffix = "LIMIT $resultsPerPage OFFSET ${max(0, page) * resultsPerPage}",
+        )
         queryBuilder.addWhereIfNotNull("user = ?", userId)
         if (origin != null && radius != null && radius >= 0) {
             queryBuilder.addWhere("wid = ?", wid)
@@ -134,24 +138,45 @@ object CPDatabase {
         if (before != null) {
             queryBuilder.addWhere("time < ?", before.epochSecond)
         }
-        val list = mutableListOf<ContainerLookupResult>()
+        val list = mutableListOf<ContainerLog>()
         queryBuilder.executeQuery { rs ->
             while (rs.next()) {
-                list.add(ContainerLookupResult(
-                    LocalDateTime.ofInstant(Instant.ofEpochSecond(rs.getLong("time")), PluginConfig.instance.getZoneId()),
-                    getUserById(rs.getInt("user")) ?: User.unknown(rs.getInt("user")),
-                    rs.getInt("wid"),
-                    rs.getInt("x"),
-                    rs.getInt("y"),
-                    rs.getInt("z"),
-                    Util.getType(rs.getInt("type")),
-                    rs.getInt("amount"),
-                    rs.getBytes("metadata"),
-                    ContainerLookupResult.Action.fromInt(rs.getInt("action")),
-                    rs.getInt("rolled_back") != 0,
-                ))
+                list.add(
+                    ContainerLog(
+                        LocalDateTime.ofInstant(
+                            Instant.ofEpochSecond(rs.getLong("time")),
+                            PluginConfig.instance.getZoneId()
+                        ),
+                        getUserById(rs.getInt("user")) ?: User.unknown(rs.getInt("user")),
+                        rs.getInt("wid"),
+                        rs.getInt("x"),
+                        rs.getInt("y"),
+                        rs.getInt("z"),
+                        Util.getType(rs.getInt("type")),
+                        rs.getInt("amount"),
+                        rs.getBytes("metadata"),
+                        ContainerLog.Action.fromInt(rs.getInt("action")),
+                        rs.getInt("rolled_back") != 0,
+                    )
+                )
             }
         }
-        return list
+        list.reverse()
+
+        queryBuilder.sql = "SELECT COUNT(*) FROM (SELECT 1 FROM `${ConfigHandler.prefix}container`"
+        queryBuilder.suffix = "LIMIT ${resultsPerPage * 1000} OFFSET ${max(0, page) * resultsPerPage})"
+        val lastPageIndex = if (page < 1000000) {
+            queryBuilder.executeQuery { rs ->
+                if (rs.next()) {
+                    page + rs.getInt(1) / resultsPerPage
+                } else {
+                    -1
+                }
+            }
+        } else {
+            -1
+        }
+
+        return ContainerLookupResult(list, lastPageIndex)
     }
 }

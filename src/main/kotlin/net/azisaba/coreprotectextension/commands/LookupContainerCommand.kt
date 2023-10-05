@@ -57,8 +57,8 @@ class LookupContainerCommand(private val plugin: CoreProtectExtension) : Command
             }
         }?.let { Instant.ofEpochMilli(it) }
         Bukkit.getScheduler().runTaskAsynchronously(plugin, Runnable {
-            val list = try {
-                CPDatabase.lookupContainer(sender.location, argUser, after, before, argRadius, argPage).reversed()
+            val result = try {
+                CPDatabase.lookupContainer(sender.location, argUser, after, before, argRadius, argPage)
             } catch (e: Exception) {
                 sender.sendMessage("${ChatColor.RED}An error occurred while executing command.")
                 plugin.slF4JLogger.error("Failed to execute command from ${sender.name}: /cpe lookup-container ${args.joinToString(" ")}", e)
@@ -67,7 +67,7 @@ class LookupContainerCommand(private val plugin: CoreProtectExtension) : Command
             if (getItem != null) {
                 if (sender.hasPermission("coreprotectextension.command.lookup-container.get-item")) {
                     Bukkit.getScheduler().runTask(plugin, Runnable {
-                        sender.inventory.addItem(list[getItem].getItemStack().apply { amount = 1 })
+                        sender.inventory.addItem(result.data[getItem].getItemStack().apply { amount = 1 })
                     })
                 } else {
                     sender.sendActionBar("${ChatColor.RED}You don't have permission.")
@@ -79,7 +79,7 @@ class LookupContainerCommand(private val plugin: CoreProtectExtension) : Command
             argRadius?.let { commandWithoutPage += "radius=$it " }
             before?.let { commandWithoutPage += "before=\"${dateFormat.format(it.toEpochMilli())}\"" }
             after?.let { commandWithoutPage += "after=\"${dateFormat.format(it.toEpochMilli())}\"" }
-            Util.sendResults(sender, list, commandWithoutPage, argPage)
+            Util.sendResults(sender, result, commandWithoutPage, argPage)
         })
     }
 

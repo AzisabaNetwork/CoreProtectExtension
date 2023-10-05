@@ -54,14 +54,15 @@ class InspectCommand(private val plugin: CoreProtectExtension) : Command {
             return sender.sendActionBar("${ChatColor.RED}You are too far from provided location.")
         }
         Bukkit.getScheduler().runTaskAsynchronously(plugin, Runnable {
-            var list = try {
-                CPDatabase.lookupContainer(location, null, null, null, -1, argPage, resultsPerPage = 10).reversed()
+            var result = try {
+                CPDatabase.lookupContainer(location, null, null, null, -1, argPage, resultsPerPage = 10)
             } catch (e: Exception) {
                 sender.sendMessage("${ChatColor.RED}An error occurred while executing command.")
                 plugin.slF4JLogger.error("Failed to execute command from ${sender.name}: /cpe inspect ${args.joinToString(" ")}", e)
                 return@Runnable
             }
-            if (list.isEmpty()) {
+            if (result.data.isEmpty()) {
+                // find another part of double chest
                 Util.runInMain(plugin) {
                     location.block
                         .state
@@ -81,8 +82,8 @@ class InspectCommand(private val plugin: CoreProtectExtension) : Command {
                             }
                         }
                 }?.run {
-                    list = try {
-                        CPDatabase.lookupContainer(this, null, null, null, -1, argPage, resultsPerPage = 10).reversed()
+                    result = try {
+                        CPDatabase.lookupContainer(this, null, null, null, -1, argPage, resultsPerPage = 10)
                     } catch (e: Exception) {
                         sender.sendMessage("${ChatColor.RED}An error occurred while executing command.")
                         plugin.slF4JLogger.error(
@@ -95,7 +96,7 @@ class InspectCommand(private val plugin: CoreProtectExtension) : Command {
             if (getItem != null) {
                 if (sender.hasPermission("coreprotectextension.command.inspect.get-item")) {
                     Bukkit.getScheduler().runTask(plugin, Runnable {
-                        sender.inventory.addItem(list[getItem].getItemStack().apply { amount = 1 })
+                        sender.inventory.addItem(result.data[getItem].getItemStack().apply { amount = 1 })
                     })
                 } else {
                     sender.sendActionBar("${ChatColor.RED}You don't have permission.")
@@ -103,7 +104,7 @@ class InspectCommand(private val plugin: CoreProtectExtension) : Command {
                 return@Runnable
             }
             val commandWithoutPage = "/cpe inspect location=${arguments.getArgument("location")} "
-            Util.sendResults(sender, list, commandWithoutPage, argPage, showLocation = false, resultsPerPage = 10)
+            Util.sendResults(sender, result, commandWithoutPage, argPage, showLocation = false, resultsPerPage = 10)
         })
     }
 
