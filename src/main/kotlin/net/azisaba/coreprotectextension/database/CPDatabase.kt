@@ -161,7 +161,6 @@ object CPDatabase {
                 )
             }
         }
-        list.reverse()
 
         queryBuilder.sql = "SELECT COUNT(*) FROM (SELECT 1 FROM `${ConfigHandler.prefix}container`"
         queryBuilder.suffix = "LIMIT ${resultsPerPage * 1000} OFFSET ${max(0, page) * resultsPerPage})"
