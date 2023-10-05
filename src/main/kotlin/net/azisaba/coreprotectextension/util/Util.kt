@@ -206,7 +206,7 @@ object Util {
             } else {
                 log.type.name.lowercase()
             }
-            val item = TextComponent(itemName).apply { color = ChatColor.AQUA.asBungee() }
+            val item = TextComponent(*TextComponent.fromLegacyText(itemName)).apply { color = ChatColor.AQUA.asBungee() }
             val tag = "{\"id\":\"minecraft:${log.type.name.lowercase()}\",Count:${log.amount},tag:${itemStack.getSNBT()}}"
             if (tag.toByteArray().size < 260000) {
                 item.hoverEvent = HoverEvent(HoverEvent.Action.SHOW_ITEM, arrayOf(TextComponent(tag)))
@@ -230,6 +230,7 @@ object Util {
             text.addExtra(item)
             if (log.rolledBack) {
                 amount.isStrikethrough = true
+                item.isStrikethrough = true
                 text.isStrikethrough = true
             }
             sender.spigot().sendMessage(text)
