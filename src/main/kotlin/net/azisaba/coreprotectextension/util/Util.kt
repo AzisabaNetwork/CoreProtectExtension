@@ -200,8 +200,13 @@ object Util {
                 .apply { color = ChatColor.entries[3 + abs(log.user.name.hashCode() * 3) % 12].asBungee() }
             user.hoverEvent = HoverEvent(HoverEvent.Action.SHOW_TEXT, TextComponent.fromLegacyText(log.user.uuid.toString()))
             val amount = TextComponent(*TextComponent.fromLegacyText("§${log.action.color}${log.action.short}${log.amount} "))
-            val item = TextComponent(log.type.name.lowercase()).apply { color = ChatColor.AQUA.asBungee() }
             val itemStack = log.getItemStack()
+            val itemName = if (itemStack.itemMeta?.hasDisplayName() == true) {
+                "${itemStack.itemMeta!!.displayName} ${ChatColor.DARK_GRAY}(${log.type.name.lowercase()})"
+            } else {
+                log.type.name.lowercase()
+            }
+            val item = TextComponent(itemName).apply { color = ChatColor.AQUA.asBungee() }
             val tag = "{\"id\":\"minecraft:${log.type.name.lowercase()}\",Count:${log.amount},tag:${itemStack.getSNBT()}}"
             if (tag.toByteArray().size < 260000) {
                 item.hoverEvent = HoverEvent(HoverEvent.Action.SHOW_ITEM, arrayOf(TextComponent(tag)))
