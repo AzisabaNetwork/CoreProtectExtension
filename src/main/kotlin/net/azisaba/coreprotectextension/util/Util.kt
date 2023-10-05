@@ -2,7 +2,6 @@ package net.azisaba.coreprotectextension.util
 
 import net.azisaba.coreprotectextension.config.PluginConfig
 import net.azisaba.coreprotectextension.database.CPDatabase
-import net.azisaba.coreprotectextension.model.ContainerLog
 import net.azisaba.coreprotectextension.model.ContainerLookupResult
 import net.md_5.bungee.api.chat.ClickEvent
 import net.md_5.bungee.api.chat.HoverEvent
@@ -198,6 +197,7 @@ object Util {
             time.hoverEvent = HoverEvent(HoverEvent.Action.SHOW_TEXT, TextComponent.fromLegacyText(formats[0].format(log.time.toInstant().toEpochMilli())))
             val user = TextComponent("${log.user.name} ").apply { color = ChatColor.GOLD.asBungee() }
             user.hoverEvent = HoverEvent(HoverEvent.Action.SHOW_TEXT, TextComponent.fromLegacyText(log.user.uuid.toString()))
+            val amount = TextComponent(*TextComponent.fromLegacyText("§${log.action.color}${log.action.short}${log.amount} "))
             val item = TextComponent(log.type.name.lowercase()).apply { color = ChatColor.AQUA.asBungee() }
             val itemStack = log.getItemStack()
             val tag = "{\"id\":\"minecraft:${log.type.name.lowercase()}\",Count:${log.amount},tag:${itemStack.getSNBT()}}"
@@ -219,8 +219,12 @@ object Util {
             item.clickEvent = ClickEvent(ClickEvent.Action.RUN_COMMAND, "$commandWithoutPage page=${pageIndex + 1} getitemindex=${index}")
             text.addExtra(time)
             text.addExtra(user)
-            text.addExtra("§${log.action.color}${log.action.short}${log.amount} ")
+            text.addExtra(amount)
             text.addExtra(item)
+            if (log.rolledBack) {
+                amount.isStrikethrough = true
+                text.isStrikethrough = true
+            }
             sender.spigot().sendMessage(text)
             if (showLocation) {
                 val location = TextComponent(
