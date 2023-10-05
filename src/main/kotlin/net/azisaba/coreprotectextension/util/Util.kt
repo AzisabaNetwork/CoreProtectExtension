@@ -20,6 +20,7 @@ import java.time.Instant
 import java.time.LocalDateTime
 import java.util.*
 import java.util.concurrent.CompletableFuture
+import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.min
 
@@ -195,7 +196,8 @@ object Util {
             val time = TextComponent("${log.time.getTimeSince(now)} ago ")
                 .apply { color = ChatColor.GRAY.asBungee() }
             time.hoverEvent = HoverEvent(HoverEvent.Action.SHOW_TEXT, TextComponent.fromLegacyText(formats[0].format(log.time.toInstant().toEpochMilli())))
-            val user = TextComponent("${log.user.name} ").apply { color = ChatColor.GOLD.asBungee() }
+            val user = TextComponent("${log.user.name} ")
+                .apply { color = ChatColor.entries[3 + abs(log.user.name.hashCode() * 3) % 12].asBungee() }
             user.hoverEvent = HoverEvent(HoverEvent.Action.SHOW_TEXT, TextComponent.fromLegacyText(log.user.uuid.toString()))
             val amount = TextComponent(*TextComponent.fromLegacyText("§${log.action.color}${log.action.short}${log.amount} "))
             val item = TextComponent(log.type.name.lowercase()).apply { color = ChatColor.AQUA.asBungee() }
