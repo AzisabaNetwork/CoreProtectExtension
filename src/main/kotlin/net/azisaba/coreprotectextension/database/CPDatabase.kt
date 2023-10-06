@@ -101,26 +101,19 @@ object CPDatabase {
         }
     }
 
-    /**
-     * Lookup the container logs.
-     * @param radius Set to null to search everything of the world. Set to >=0 search by horizontal radius, and negative value to search by exact position.
-     */
-    fun lookupContainer(
+    private fun fillQueryBuilderGeneric(
+        queryBuilder: QueryBuilder,
         origin: Location?,
         user: String?,
         after: Instant?,
         before: Instant?,
         radius: Int?,
-        page: Int = 0,
-        resultsPerPage: Int = 5,
-    ): ContainerLookupResult {
-        val userId = user?.let { getUserByName(it)?.id }
+    ) {
+        val userIds = user?.let { it.split(",").map { name -> getUserByName(name)?.id } }
         val wid = origin?.let { getWorldId(it.world.name) }
-        val queryBuilder = QueryBuilder(
-            "SELECT * FROM `${ConfigHandler.prefix}container`",
-            suffix = "LIMIT $resultsPerPage OFFSET ${max(0, page) * resultsPerPage}",
-        )
-        queryBuilder.addWhereIfNotNull("user = ?", userId)
+        userIds?.let {
+            queryBuilder.addWhere("user IN (${it.joinToString(", ") { "?" }})", *it.toTypedArray())
+        }
         if (origin != null && radius != null && radius >= 0) {
             queryBuilder.addWhere("wid = ?", wid)
             queryBuilder.addWhere("abs(x - ?) <= ?", origin.blockX, radius)
@@ -138,6 +131,94 @@ object CPDatabase {
         if (before != null) {
             queryBuilder.addWhere("time < ?", before.epochSecond)
         }
+    }
+
+    private fun getLastPageIndex(queryBuilder: QueryBuilder, page: Int, resultsPerPage: Int) =
+        if (page < 1000000) {
+            queryBuilder.executeQuery { rs ->
+                if (rs.next()) {
+                    page + rs.getInt(1) / resultsPerPage
+                } else {
+                    -1
+                }
+            }
+        } else {
+            -1
+        }
+
+    /**
+     * Lookup the item logs.
+     * @param radius Set to null to search everything of the world. Set to >=0 search by horizontal radius, and negative value to search by exact position.
+     */
+    fun lookupItem(
+        origin: Location?,
+        user: String?,
+        after: Instant?,
+        before: Instant?,
+        radius: Int?,
+        page: Int = 0,
+        resultsPerPage: Int = 5,
+    ): ContainerLookupResult {
+        val queryBuilder = QueryBuilder(
+            "SELECT * FROM `${ConfigHandler.prefix}item`",
+            suffix = "LIMIT $resultsPerPage OFFSET ${max(0, page) * resultsPerPage}",
+        )
+        queryBuilder.addWhere("action = 2 OR action = 3")
+        fillQueryBuilderGeneric(queryBuilder, origin, user, after, before, radius)
+        val list = mutableListOf<ContainerLog>()
+        queryBuilder.executeQuery { rs ->
+            while (rs.next()) {
+                val action = when (rs.getInt("action")) {
+                    2 -> ContainerLog.Action.REMOVED
+                    3 -> ContainerLog.Action.ADDED
+                    else -> null
+                }
+                if (action != null) {
+                    list.add(
+                        ContainerLog(
+                            LocalDateTime.ofInstant(
+                                Instant.ofEpochSecond(rs.getLong("time")),
+                                PluginConfig.instance.getZoneId()
+                            ),
+                            getUserById(rs.getInt("user")) ?: User.unknown(rs.getInt("user")),
+                            rs.getInt("wid"),
+                            rs.getInt("x"),
+                            rs.getInt("y"),
+                            rs.getInt("z"),
+                            Util.getType(rs.getInt("type")),
+                            rs.getInt("amount"),
+                            rs.getBytes("data"),
+                            action,
+                            rs.getInt("rolled_back") != 0,
+                        )
+                    )
+                }
+            }
+        }
+
+        queryBuilder.sql = "SELECT COUNT(*) FROM (SELECT 1 FROM `${ConfigHandler.prefix}item`"
+        queryBuilder.suffix = "LIMIT ${resultsPerPage * 1000} OFFSET ${max(0, page) * resultsPerPage})"
+        return ContainerLookupResult(list, getLastPageIndex(queryBuilder, page, resultsPerPage))
+    }
+
+    /**
+     * Lookup the container logs.
+     * @param radius Set to null to search everything of the world. Set to >=0 search by horizontal radius, and negative value to search by exact position.
+     */
+    fun lookupContainer(
+        origin: Location?,
+        user: String?,
+        after: Instant?,
+        before: Instant?,
+        radius: Int?,
+        page: Int = 0,
+        resultsPerPage: Int = 5,
+    ): ContainerLookupResult {
+        val queryBuilder = QueryBuilder(
+            "SELECT * FROM `${ConfigHandler.prefix}container`",
+            suffix = "LIMIT $resultsPerPage OFFSET ${max(0, page) * resultsPerPage}",
+        )
+        fillQueryBuilderGeneric(queryBuilder, origin, user, after, before, radius)
         val list = mutableListOf<ContainerLog>()
         queryBuilder.executeQuery { rs ->
             while (rs.next()) {
@@ -164,18 +245,6 @@ object CPDatabase {
 
         queryBuilder.sql = "SELECT COUNT(*) FROM (SELECT 1 FROM `${ConfigHandler.prefix}container`"
         queryBuilder.suffix = "LIMIT ${resultsPerPage * 1000} OFFSET ${max(0, page) * resultsPerPage})"
-        val lastPageIndex = if (page < 1000000) {
-            queryBuilder.executeQuery { rs ->
-                if (rs.next()) {
-                    page + rs.getInt(1) / resultsPerPage
-                } else {
-                    -1
-                }
-            }
-        } else {
-            -1
-        }
-
-        return ContainerLookupResult(list, lastPageIndex)
+        return ContainerLookupResult(list, getLastPageIndex(queryBuilder, page, resultsPerPage))
     }
 }

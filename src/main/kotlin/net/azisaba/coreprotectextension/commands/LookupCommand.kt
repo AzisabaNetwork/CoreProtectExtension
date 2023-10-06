@@ -14,12 +14,12 @@ import java.text.SimpleDateFormat
 import java.time.Instant
 import kotlin.math.max
 
-class LookupContainerCommand(private val plugin: CoreProtectExtension) : Command {
-    override val name = "lookup-container"
+class LookupCommand(private val plugin: CoreProtectExtension) : Command {
+    override val name = "lookup"
     override val summary = "Lookup container logs by arguments."
     override val description = "$summary \"time:(time)\" in CoreProtect is \"after=(time)\" in CoreProtectExtension."
-    override val usage = listOf("[user=] [radius=] [page=] [before=] [after=]")
-    private val params = listOf("user=", "radius=", "page=", "before=", "after=")
+    override val usage = listOf("<action=> [user=] [radius=] [page=] [before=] [after=]")
+    private val params = listOf("action=", "user=", "radius=", "page=", "before=", "after=")
     private val dateFormat = SimpleDateFormat("yyyy/MM/dd HH:mm:ss Z")
     private val parser =
         ArgumentParserBuilder.builder()
@@ -37,6 +37,11 @@ class LookupContainerCommand(private val plugin: CoreProtectExtension) : Command
             parser.parse(args.joinToString(" "))
         } catch (e: InvalidArgumentException) {
             return sender.spigot().sendMessage(e.toComponent())
+        }
+        val action = arguments.getArgument("action")
+            ?: return sender.sendMessage("${ChatColor.RED}Action must be provided.")
+        if (action !in listOf("container", "item")) {
+            return sender.sendMessage("${ChatColor.RED}Invalid action: $action")
         }
         val getItem = arguments.getArgument("getitemindex")?.toInt()
         val argUser = arguments.getArgument("user")
@@ -58,14 +63,18 @@ class LookupContainerCommand(private val plugin: CoreProtectExtension) : Command
         }?.let { Instant.ofEpochMilli(it) }
         Bukkit.getScheduler().runTaskAsynchronously(plugin, Runnable {
             val result = try {
-                CPDatabase.lookupContainer(sender.location, argUser, after, before, argRadius, argPage)
+                when (action) {
+                    "container" -> CPDatabase.lookupContainer(sender.location, argUser, after, before, argRadius, argPage)
+                    "item" -> CPDatabase.lookupItem(sender.location, argUser, after, before, argRadius, argPage)
+                    else -> error("Invalid action: $action")
+                }
             } catch (e: Exception) {
                 sender.sendMessage("${ChatColor.RED}An error occurred while executing command.")
-                plugin.slF4JLogger.error("Failed to execute command from ${sender.name}: /cpe lookup-container ${args.joinToString(" ")}", e)
+                plugin.slF4JLogger.error("Failed to execute command from ${sender.name}: /cpe lookup ${args.joinToString(" ")}", e)
                 return@Runnable
             }
             if (getItem != null) {
-                if (sender.hasPermission("coreprotectextension.command.lookup-container.get-item")) {
+                if (sender.hasPermission("coreprotectextension.command.lookup.get-item")) {
                     Bukkit.getScheduler().runTask(plugin, Runnable {
                         sender.inventory.addItem(result.data[getItem].getItemStack().apply { amount = 1 })
                     })
@@ -74,7 +83,7 @@ class LookupContainerCommand(private val plugin: CoreProtectExtension) : Command
                 }
                 return@Runnable
             }
-            var commandWithoutPage = "/cpe lookup-container "
+            var commandWithoutPage = "/cpe lookup action=$action "
             argUser?.let { commandWithoutPage += "user=$it " }
             argRadius?.let { commandWithoutPage += "radius=$it " }
             before?.let { commandWithoutPage += "before=\"${dateFormat.format(it.toEpochMilli())}\"" }
@@ -85,6 +94,9 @@ class LookupContainerCommand(private val plugin: CoreProtectExtension) : Command
 
     override fun suggest(sender: CommandSender, args: Array<String>): List<String> {
         if (args.isEmpty()) return emptyList()
+        if (args.last().startsWith("action=")) {
+            return listOf("container", "item").map { "action=$it" }.filter { it.startsWith(args.last(), true) }
+        }
         if (args.last().startsWith("user=")) {
             return Bukkit.getOnlinePlayers().map { it.name }.map { "user=$it" }.filter { it.startsWith(args.last(), true) }
         }
