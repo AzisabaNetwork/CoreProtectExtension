@@ -21,11 +21,7 @@ data class ContainerLog(
 ) {
     enum class Action(val color: Char, val short: Char) {
         REMOVED('c', '-'),
-        ADDED('a', '+');
-
-        companion object {
-            fun fromInt(i: Int) = entries[i]
-        }
+        ADDED('a', '+')
     }
 
     fun getItemStack() = ItemStack(type, amount).let { Rollback.populateItemStack(it, metadata)[2] as ItemStack }

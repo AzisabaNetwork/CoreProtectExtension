@@ -25,13 +25,11 @@ class QueryBuilder(@Language("SQL") var sql: String, vararg values: Any?, var su
             sql += " WHERE " + where.joinToString(" AND ")
         }
         sql += " $suffix"
-        return CPDatabase.getConnectionOrThrow().use { conn ->
-            conn.prepareStatement(sql).use { ps ->
-                values.forEachIndexed { index, obj ->
-                    ps.setObject(index + 1, obj)
-                }
-                ps.executeQuery().use(action)
+        return CPDatabase.getConnectionOrThrow().execute(sql) { ps ->
+            values.forEachIndexed { index, obj ->
+                ps.setObject(index + 1, obj)
             }
+            ps.executeQuery().use(action)
         }
     }
 }

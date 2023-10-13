@@ -6,10 +6,13 @@ import net.azisaba.coreprotectextension.config.PluginConfig
 import net.azisaba.coreprotectextension.model.User
 import net.azisaba.coreprotectextension.model.ContainerLog
 import net.azisaba.coreprotectextension.model.ContainerLookupResult
+import net.azisaba.coreprotectextension.model.LookupException
+import net.azisaba.coreprotectextension.util.NumberOperation
 import net.coreprotect.config.ConfigHandler
 import net.coreprotect.database.Database
 import net.coreprotect.utility.Util
 import org.bukkit.Location
+import org.bukkit.Material
 import java.sql.Connection
 import java.time.Instant
 import java.time.LocalDateTime
@@ -90,7 +93,7 @@ object CPDatabase {
                             User(
                                 rs.getInt("id"),
                                 rs.getString("user"),
-                                UUID.fromString(rs.getString("uuid")),
+                                rs.getString("uuid")?.let { UUID.fromString(it) },
                             ).apply { userCache.add(this) }
                         } else {
                             negativeUserCache.add(name)
@@ -101,6 +104,27 @@ object CPDatabase {
         }
     }
 
+    private fun matchMaterials(regex: Regex): Set<Material> =
+        Material.entries
+            .filter { !it.name.startsWith("LEGACY_") }
+            .filter { regex.matchEntire(it.name) != null }
+            .toSet()
+
+    private fun fillQueryBuilderIncludeExcludeItems(queryBuilder: QueryBuilder, include: String?, exclude: String?) {
+        include?.split(",")
+            ?.flatMap { matchMaterials(it.toRegex(RegexOption.IGNORE_CASE)) }
+            ?.joinToString(" OR ") { "type = " + Util.getMaterialId(it) }
+                ?.let { queryBuilder.addWhere(it) }
+        exclude?.split(",")?.flatMap { entry ->
+            mutableListOf<String>().also { list ->
+                try {
+                    list += matchMaterials(entry.toRegex(RegexOption.IGNORE_CASE)).map { "type != " + Util.getMaterialId(it) }
+                } catch (ignored: IllegalArgumentException) {}
+                getUserByName(entry)?.id?.let { list += listOf("user != $it") }
+            }
+        }?.joinToString(" AND ")?.let { queryBuilder.addWhere(it) }
+    }
+
     private fun fillQueryBuilderGeneric(
         queryBuilder: QueryBuilder,
         origin: Location?,
@@ -109,7 +133,7 @@ object CPDatabase {
         before: Instant?,
         radius: Int?,
     ) {
-        val userIds = user?.let { it.split(",").map { name -> getUserByName(name)?.id } }
+        val userIds = user?.let { it.split(",").map { name -> (getUserByName(name) ?: LookupException.throwNoUser(name)).id } }
         val wid = origin?.let { getWorldId(it.world.name) }
         userIds?.let {
             queryBuilder.addWhere("user IN (${it.joinToString(", ") { "?" }})", *it.toTypedArray())
@@ -151,20 +175,30 @@ object CPDatabase {
      * @param radius Set to null to search everything of the world. Set to >=0 search by horizontal radius, and negative value to search by exact position.
      */
     fun lookupItem(
+        filterAction: ContainerLog.Action?,
         origin: Location?,
         user: String?,
         after: Instant?,
         before: Instant?,
+        include: String?,
+        exclude: String?,
+        filterAmount: NumberOperation<Int>? = null,
         radius: Int?,
         page: Int = 0,
         resultsPerPage: Int = 5,
     ): ContainerLookupResult {
         val queryBuilder = QueryBuilder(
             "SELECT * FROM `${ConfigHandler.prefix}item`",
-            suffix = "LIMIT $resultsPerPage OFFSET ${max(0, page) * resultsPerPage}",
+            suffix = "ORDER BY `time` ASC LIMIT $resultsPerPage OFFSET ${max(0, page) * resultsPerPage}",
         )
-        queryBuilder.addWhere("action = 2 OR action = 3")
+        when (filterAction) {
+            ContainerLog.Action.REMOVED -> queryBuilder.addWhere("action = 2") // drop
+            ContainerLog.Action.ADDED -> queryBuilder.addWhere("action = 3") // pickup
+            else -> queryBuilder.addWhere("action = 2 OR action = 3") // both
+        }
+        if (filterAmount != null) queryBuilder.addWhere("amount ${filterAmount.type.op} ${filterAmount.number}")
         fillQueryBuilderGeneric(queryBuilder, origin, user, after, before, radius)
+        fillQueryBuilderIncludeExcludeItems(queryBuilder, include, exclude)
         val list = mutableListOf<ContainerLog>()
         queryBuilder.executeQuery { rs ->
             while (rs.next()) {
@@ -206,19 +240,30 @@ object CPDatabase {
      * @param radius Set to null to search everything of the world. Set to >=0 search by horizontal radius, and negative value to search by exact position.
      */
     fun lookupContainer(
-        origin: Location?,
-        user: String?,
-        after: Instant?,
-        before: Instant?,
-        radius: Int?,
+        filterAction: ContainerLog.Action? = null,
+        origin: Location? = null,
+        user: String? = null,
+        after: Instant? = null,
+        before: Instant? = null,
+        include: String? = null,
+        exclude: String? = null,
+        filterAmount: NumberOperation<Int>? = null,
+        radius: Int? = null,
         page: Int = 0,
         resultsPerPage: Int = 5,
     ): ContainerLookupResult {
         val queryBuilder = QueryBuilder(
             "SELECT * FROM `${ConfigHandler.prefix}container`",
-            suffix = "LIMIT $resultsPerPage OFFSET ${max(0, page) * resultsPerPage}",
+            suffix = "ORDER BY `time` ASC LIMIT $resultsPerPage OFFSET ${max(0, page) * resultsPerPage}",
         )
+        when (filterAction) {
+            ContainerLog.Action.REMOVED -> queryBuilder.addWhere("action = 0")
+            ContainerLog.Action.ADDED -> queryBuilder.addWhere("action = 1")
+            else -> {}
+        }
+        if (filterAmount != null) queryBuilder.addWhere("amount ${filterAmount.type.op} ${filterAmount.number}")
         fillQueryBuilderGeneric(queryBuilder, origin, user, after, before, radius)
+        fillQueryBuilderIncludeExcludeItems(queryBuilder, include, exclude)
         val list = mutableListOf<ContainerLog>()
         queryBuilder.executeQuery { rs ->
             while (rs.next()) {
@@ -236,7 +281,7 @@ object CPDatabase {
                         Util.getType(rs.getInt("type")),
                         rs.getInt("amount"),
                         rs.getBytes("metadata"),
-                        ContainerLog.Action.fromInt(rs.getInt("action")),
+                        ContainerLog.Action.entries[rs.getInt("action")],
                         rs.getInt("rolled_back") != 0,
                     )
                 )

@@ -55,7 +55,7 @@ class InspectCommand(private val plugin: CoreProtectExtension) : Command {
         }
         Bukkit.getScheduler().runTaskAsynchronously(plugin, Runnable {
             var result = try {
-                CPDatabase.lookupContainer(location, null, null, null, -1, argPage, resultsPerPage = 10)
+                CPDatabase.lookupContainer(origin = location, radius = -1, page = argPage, resultsPerPage = 10)
             } catch (e: Exception) {
                 sender.sendMessage("${ChatColor.RED}An error occurred while executing command.")
                 plugin.slF4JLogger.error("Failed to execute command from ${sender.name}: /cpe inspect ${args.joinToString(" ")}", e)
@@ -83,7 +83,7 @@ class InspectCommand(private val plugin: CoreProtectExtension) : Command {
                         }
                 }?.run {
                     result = try {
-                        CPDatabase.lookupContainer(this, null, null, null, -1, argPage, resultsPerPage = 10)
+                        CPDatabase.lookupContainer(origin = this, radius = -1, page = argPage, resultsPerPage = 10)
                     } catch (e: Exception) {
                         sender.sendMessage("${ChatColor.RED}An error occurred while executing command.")
                         plugin.slF4JLogger.error(
