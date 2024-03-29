@@ -83,6 +83,7 @@ class CommandManager(private val plugin: CoreProtectExtension) : TabExecutor {
         registerCommand(HelpCommand(this))
         registerCommand(SQLQueryCommand(plugin))
         registerCommand(LookupCommand(plugin))
+        registerCommand(LookupSelfCommand(plugin))
         registerCommand(ClearCacheCommand)
         registerCommand(InspectCommand(plugin))
     }

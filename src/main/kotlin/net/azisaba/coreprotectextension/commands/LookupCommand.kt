@@ -16,6 +16,7 @@ import xyz.acrylicstyle.util.ArgumentParserBuilder
 import xyz.acrylicstyle.util.InvalidArgumentException
 import java.text.SimpleDateFormat
 import java.time.Instant
+import java.util.concurrent.CompletableFuture
 import kotlin.math.max
 
 class LookupCommand(private val plugin: CoreProtectExtension) : Command {
@@ -24,90 +25,111 @@ class LookupCommand(private val plugin: CoreProtectExtension) : Command {
     override val description = "$summary \"time:(time)\" in CoreProtect is \"after=(time)\" in CoreProtectExtension."
     override val usage = listOf("<action=> [user=] [radius=] [page=] [before=] [after=] [include=] [exclude=] [amount=]")
     private val params = listOf("action=", "user=", "radius=", "page=", "before=", "after=", "include=", "exclude=", "amount=")
-    private val validActions = listOf("container", "+container", "-container", "item", "+item", "-item")
-    private val dateFormat = SimpleDateFormat("yyyy/MM/dd HH:mm:ss Z")
-    private val parser =
-        ArgumentParserBuilder.builder()
-            .parseOptionsWithoutDash()
-            .disallowEscapedTabCharacter()
-            .disallowEscapedLineTerminators()
-            .literalBackslash()
-            .create()
 
     override fun execute(sender: CommandSender, args: Array<String>) {
-        if (sender !is Player) {
-            return sender.sendMessage("${ChatColor.RED}This command must be executed by the player.")
-        }
-        val arguments = try {
-            parser.parse(args.joinToString(" "))
-        } catch (e: InvalidArgumentException) {
-            return sender.spigot().sendMessage(e.toComponent())
-        }
-        val action = arguments.getArgument("action")
-            ?: return sender.sendMessage("${ChatColor.RED}Action must be provided.")
-        if (action !in validActions) {
-            return sender.sendMessage("${ChatColor.RED}Invalid action: $action")
-        }
-        val getItem = arguments.getArgument("getitemindex")?.toInt()
-        val argUser = arguments.getArgument("user")
-        val argRadius = arguments.getArgument("radius")?.toInt()
-        val argPage = max(1, arguments.getArgument("page")?.toInt() ?: 1) - 1
-        val after = arguments.getArgument("after")?.let {
-            try {
-                System.currentTimeMillis() - Util.processTime(it)
-            } catch (e: Exception) {
-                Util.parseDateTime(it)
+        execute(plugin, sender, args)
+    }
+
+    companion object {
+        val validActions = listOf("container", "+container", "-container", "item", "+item", "-item")
+        private val dateFormat = SimpleDateFormat("yyyy/MM/dd HH:mm:ss Z")
+        private val parser =
+            ArgumentParserBuilder.builder()
+                .parseOptionsWithoutDash()
+                .disallowEscapedTabCharacter()
+                .disallowEscapedLineTerminators()
+                .literalBackslash()
+                .create()
+
+        fun execute(plugin: CoreProtectExtension, sender: CommandSender, args: Array<String>, user: String? = null, subcommand: String = "lookup"): CompletableFuture<Void> {
+            if (sender !is Player) {
+                sender.sendMessage("${ChatColor.RED}This command must be executed by the player.")
+                return CompletableFuture.completedFuture(null)
             }
-        }?.let { Instant.ofEpochMilli(it) }
-        val before = arguments.getArgument("before")?.let {
-            try {
-                System.currentTimeMillis() - Util.processTime(it)
-            } catch (e: Exception) {
-                Util.parseDateTime(it)
+            val arguments = try {
+                parser.parse(args.joinToString(" "))
+            } catch (e: InvalidArgumentException) {
+                sender.spigot().sendMessage(e.toComponent())
+                return CompletableFuture.completedFuture(null)
             }
-        }?.let { Instant.ofEpochMilli(it) }
-        val include = arguments.getArgument("include")
-        val exclude = arguments.getArgument("exclude")
-        val amount = arguments.getArgument("amount")?.let { NumberOperation.parse<Int>(it) }
-        Bukkit.getScheduler().runTaskAsynchronously(plugin, Runnable {
-            val result = try {
-                when (action) {
-                    "container" -> CPDatabase.lookupContainer(null, sender.location, argUser, after, before, include, exclude, amount, argRadius, argPage)
-                    "+container" -> CPDatabase.lookupContainer(ContainerLog.Action.ADDED, sender.location, argUser, after, before, include, exclude, amount, argRadius, argPage)
-                    "-container" -> CPDatabase.lookupContainer(ContainerLog.Action.REMOVED, sender.location, argUser, after, before, include, exclude, amount, argRadius, argPage)
-                    "item" -> CPDatabase.lookupItem(null, sender.location, argUser, after, before, include, exclude, amount, argRadius, argPage)
-                    "+item" -> CPDatabase.lookupItem(ContainerLog.Action.ADDED, sender.location, argUser, after, before, include, exclude, amount, argRadius, argPage)
-                    "-item" -> CPDatabase.lookupItem(ContainerLog.Action.REMOVED, sender.location, argUser, after, before, include, exclude, amount, argRadius, argPage)
-                    else -> error("Invalid action: $action")
+            val action = arguments.getArgument("action")
+                ?: run {
+                    sender.sendMessage("${ChatColor.RED}Action must be provided.")
+                    return CompletableFuture.completedFuture(null)
                 }
-            } catch (e: LookupException) {
-                sender.sendMessage("${ChatColor.RED}${e.message}")
-                return@Runnable
-            } catch (e: Exception) {
-                sender.sendMessage("${ChatColor.RED}An error occurred while executing command.")
-                plugin.slF4JLogger.error("Failed to execute command from ${sender.name}: /cpe lookup ${args.joinToString(" ")}", e)
-                return@Runnable
+            if (action !in validActions) {
+                sender.sendMessage("${ChatColor.RED}Invalid action: $action")
+                return CompletableFuture.completedFuture(null)
             }
-            if (getItem != null) {
-                if (sender.hasPermission("coreprotectextension.command.lookup.get-item")) {
-                    Bukkit.getScheduler().runTask(plugin, Runnable {
-                        sender.inventory.addItem(result.data[getItem].getItemStack().apply { this.amount = 1 })
-                    })
-                } else {
-                    sender.sendActionBar("${ChatColor.RED}You don't have permission.")
+            val getItem = arguments.getArgument("getitemindex")?.toInt()
+            val argUser = user ?: arguments.getArgument("user")
+            val argRadius = arguments.getArgument("radius")?.toInt()
+            val argPage = max(1, arguments.getArgument("page")?.toInt() ?: 1) - 1
+            val after = arguments.getArgument("after")?.let {
+                try {
+                    System.currentTimeMillis() - Util.processTime(it)
+                } catch (e: Exception) {
+                    Util.parseDateTime(it)
                 }
-                return@Runnable
-            }
-            var commandWithoutPage = "/cpe lookup action=$action "
-            argUser?.let { commandWithoutPage += "user=$it " }
-            argRadius?.let { commandWithoutPage += "radius=$it " }
-            before?.let { commandWithoutPage += "before=\"${dateFormat.format(it.toEpochMilli())}\" " }
-            after?.let { commandWithoutPage += "after=\"${dateFormat.format(it.toEpochMilli())}\" " }
-            include?.let { commandWithoutPage += "include=\"${include.replace("\"", "\\\"")}\" " }
-            exclude?.let { commandWithoutPage += "exclude=\"${exclude.replace("\"", "\\\"")}\" " }
-            amount?.let { commandWithoutPage += "amount=\"$it\" " }
-            Util.sendResults(sender, result, commandWithoutPage, argPage)
-        })
+            }?.let { Instant.ofEpochMilli(it) }
+            val before = arguments.getArgument("before")?.let {
+                try {
+                    System.currentTimeMillis() - Util.processTime(it)
+                } catch (e: Exception) {
+                    Util.parseDateTime(it)
+                }
+            }?.let { Instant.ofEpochMilli(it) }
+            val include = arguments.getArgument("include")
+            val exclude = arguments.getArgument("exclude")
+            val amount = arguments.getArgument("amount")?.let { NumberOperation.parse<Int>(it) }
+            val future = CompletableFuture<Void>()
+            Bukkit.getScheduler().runTaskAsynchronously(plugin, Runnable {
+                try {
+                    val result = try {
+                        when (action) {
+                            "container" -> CPDatabase.lookupContainer(null, sender.location, argUser, after, before, include, exclude, amount, argRadius, argPage)
+                            "+container" -> CPDatabase.lookupContainer(ContainerLog.Action.ADDED, sender.location, argUser, after, before, include, exclude, amount, argRadius, argPage)
+                            "-container" -> CPDatabase.lookupContainer(ContainerLog.Action.REMOVED, sender.location, argUser, after, before, include, exclude, amount, argRadius, argPage)
+                            "item" -> CPDatabase.lookupItem(null, sender.location, argUser, after, before, include, exclude, amount, argRadius, argPage)
+                            "+item" -> CPDatabase.lookupItem(ContainerLog.Action.ADDED, sender.location, argUser, after, before, include, exclude, amount, argRadius, argPage)
+                            "-item" -> CPDatabase.lookupItem(ContainerLog.Action.REMOVED, sender.location, argUser, after, before, include, exclude, amount, argRadius, argPage)
+                            else -> error("Invalid action: $action")
+                        }
+                    } catch (e: LookupException) {
+                        sender.sendMessage("${ChatColor.RED}${e.message}")
+                        return@Runnable
+                    } catch (e: Exception) {
+                        sender.sendMessage("${ChatColor.RED}An error occurred while executing command.")
+                        plugin.slF4JLogger.error(
+                            "Failed to execute command from ${sender.name}: /cpe lookup ${args.joinToString(" ")}", e
+                        )
+                        return@Runnable
+                    }
+                    if (getItem != null) {
+                        if (sender.hasPermission("coreprotectextension.command.lookup.get-item")) {
+                            Bukkit.getScheduler().runTask(plugin, Runnable {
+                                sender.inventory.addItem(result.data[getItem].getItemStack().apply { this.amount = 1 })
+                            })
+                        } else {
+                            sender.sendActionBar("${ChatColor.RED}You don't have permission.")
+                        }
+                        return@Runnable
+                    }
+                    var commandWithoutPage = "/cpe $subcommand action=$action "
+                    argUser?.let { commandWithoutPage += "user=$it " }
+                    argRadius?.let { commandWithoutPage += "radius=$it " }
+                    before?.let { commandWithoutPage += "before=\"${dateFormat.format(it.toEpochMilli())}\" " }
+                    after?.let { commandWithoutPage += "after=\"${dateFormat.format(it.toEpochMilli())}\" " }
+                    include?.let { commandWithoutPage += "include=\"${include.replace("\"", "\\\"")}\" " }
+                    exclude?.let { commandWithoutPage += "exclude=\"${exclude.replace("\"", "\\\"")}\" " }
+                    amount?.let { commandWithoutPage += "amount=\"$it\" " }
+                    Util.sendResults(sender, result, commandWithoutPage, argPage)
+                } finally {
+                    future.complete(null)
+                }
+            })
+            return future
+        }
     }
 
     override fun suggest(sender: CommandSender, args: Array<String>): List<String> {
