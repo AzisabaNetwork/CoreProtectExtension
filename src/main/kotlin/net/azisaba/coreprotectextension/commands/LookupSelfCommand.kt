@@ -24,8 +24,13 @@ class LookupSelfCommand(private val plugin: CoreProtectExtension) : Command {
             return sender.sendMessage("${ChatColor.RED}You are already running this command.")
         }
         running.add(sender.uniqueId)
-        LookupCommand.execute(plugin, sender, args, sender.name, "lookup-self").thenRun {
+        try {
+            LookupCommand.execute(plugin, sender, args, sender.name, "lookup-self").thenRun {
+                running.remove(sender.uniqueId)
+            }
+        } catch (e: Exception) {
             running.remove(sender.uniqueId)
+            throw e
         }
     }
 
