@@ -2,6 +2,7 @@ package net.azisaba.coreprotectextension
 
 import net.azisaba.coreprotectextension.commands.CommandManager
 import net.azisaba.coreprotectextension.config.PluginConfig
+import net.azisaba.coreprotectextension.database.CPDatabase
 import net.azisaba.coreprotectextension.listener.PlayerListener
 import org.bukkit.plugin.java.JavaPlugin
 import xyz.acrylicstyle.util.reflector.Reflector
@@ -17,5 +18,9 @@ class CoreProtectExtension : JavaPlugin() {
         commandManager = CommandManager(this)
         getCommand("cpe")?.setExecutor(commandManager)
         server.pluginManager.registerEvents(PlayerListener(this), this)
+    }
+
+    override fun onDisable() {
+        CPDatabase.dataSource.close()
     }
 }

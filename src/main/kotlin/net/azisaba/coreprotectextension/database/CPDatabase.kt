@@ -9,7 +9,8 @@ import net.azisaba.coreprotectextension.model.ContainerLookupResult
 import net.azisaba.coreprotectextension.model.LookupException
 import net.azisaba.coreprotectextension.util.NumberOperation
 import net.coreprotect.config.ConfigHandler
-import net.coreprotect.database.Database
+import net.coreprotect.hikari.HikariConfig
+import net.coreprotect.hikari.HikariDataSource
 import net.coreprotect.utility.Util
 import org.bukkit.Location
 import org.bukkit.Material
@@ -23,19 +24,26 @@ object CPDatabase {
     val userCache: MutableSet<User> = Collections.synchronizedSet(mutableSetOf())
     val negativeUserCache: MutableSet<String> = Collections.synchronizedSet(mutableSetOf())
     val worldCache: MutableSet<Pair<Int, String>> = Collections.synchronizedSet(mutableSetOf())
+    val dataSource by lazy {
+        val config = HikariConfig()
+        ConfigHandler.hikariDataSource.copyStateTo(config)
+        config.driverClassName = "net.azisaba.coreprotectextension.lib.org.mariadb.jdbc.Driver"
+        config.jdbcUrl = config.jdbcUrl.replace("jdbc:mysql://", "jdbc:mariadb://")
+        HikariDataSource(config)
+    }
 
-    fun getConnection(): Connection? = Database.getConnection(true, false, false, 1000)
+    fun getConnection(): Connection? = dataSource.connection
 
     fun getConnectionOrThrow() = getConnection() ?: error("Connection is not available")
 
     fun getWorldId(name: String): Int? {
         worldCache.find { it.second.equals(name, true) }?.let { return it.first }
         return getConnectionOrThrow().use { conn ->
-            conn.prepareStatement("SELECT `id` FROM `${ConfigHandler.prefix}world` WHERE LOWER(`world`) = ? LIMIT 1").use { ps ->
+            conn.prepareStatement("SELECT `rowid` FROM `${ConfigHandler.prefix}world` WHERE LOWER(`world`) = ? LIMIT 1").use { ps ->
                 ps.setString(1, name.lowercase())
                 ps.executeQuery().use { rs ->
                     if (rs.next()) {
-                        rs.getInt("id").also { worldCache.add(it to name) }
+                        rs.getInt("rowid").also { worldCache.add(it to name) }
                     } else {
                         null
                     }
@@ -47,7 +55,7 @@ object CPDatabase {
     fun getWorldName(id: Int): String? {
         worldCache.find { it.first == id }?.let { return it.second }
         return getConnectionOrThrow().use { conn ->
-            conn.prepareStatement("SELECT `world` FROM `${ConfigHandler.prefix}world` WHERE `id` = ? LIMIT 1").use { ps ->
+            conn.prepareStatement("SELECT `world` FROM `${ConfigHandler.prefix}world` WHERE `rowid` = ? LIMIT 1").use { ps ->
                 ps.setInt(1, id)
                 ps.executeQuery().use { rs ->
                     if (rs.next()) {
@@ -63,7 +71,7 @@ object CPDatabase {
     fun getUserById(id: Int): User? {
         userCache.find { it.id == id }?.let { return it }
         return getConnectionOrThrow().use { conn ->
-            conn.prepareStatement("SELECT `user`, `uuid` FROM `${ConfigHandler.prefix}user` WHERE `id` = ?").use { ps ->
+            conn.prepareStatement("SELECT `user`, `uuid` FROM `${ConfigHandler.prefix}user` WHERE `rowid` = ?").use { ps ->
                 ps.setInt(1, id)
                 ps.executeQuery().use { rs ->
                     if (rs.next()) {
@@ -84,14 +92,14 @@ object CPDatabase {
         if (negativeUserCache.contains(name)) return null
         userCache.find { it.name == name }?.let { return it }
         return getConnectionOrThrow().use { conn ->
-            conn.prepareStatement("SELECT `id`, `user`, `uuid` FROM `${ConfigHandler.prefix}user` WHERE LOWER(`user`) = ? OR LOWER(`uuid`) = ?")
+            conn.prepareStatement("SELECT `rowid`, `user`, `uuid` FROM `${ConfigHandler.prefix}user` WHERE LOWER(`user`) = ? OR LOWER(`uuid`) = ?")
                 .use { ps ->
                     ps.setString(1, name.lowercase())
                     ps.setString(2, name.lowercase())
                     ps.executeQuery().use { rs ->
                         if (rs.next()) {
                             User(
-                                rs.getInt("id"),
+                                rs.getInt("rowid"),
                                 rs.getString("user"),
                                 rs.getString("uuid")?.let { UUID.fromString(it) },
                             ).apply { userCache.add(this) }
@@ -119,7 +127,7 @@ object CPDatabase {
             mutableListOf<String>().also { list ->
                 try {
                     list += matchMaterials(entry.toRegex(RegexOption.IGNORE_CASE)).map { "type != " + Util.getMaterialId(it) }
-                } catch (ignored: IllegalArgumentException) {}
+                } catch (_: IllegalArgumentException) {}
                 getUserByName(entry)?.id?.let { list += listOf("user != $it") }
             }
         }?.joinToString(" AND ")?.let { queryBuilder.addWhere(it) }
@@ -134,7 +142,7 @@ object CPDatabase {
         radius: Int?,
     ) {
         val userIds = user?.let { it.split(",").map { name -> (getUserByName(name) ?: LookupException.throwNoUser(name)).id } }
-        val wid = origin?.let { getWorldId(it.world.name) }
+        val wid = origin?.let { getWorldId((it.world ?: error("world is null @ $it")).name) }
         userIds?.let {
             queryBuilder.addWhere("user IN (${it.joinToString(", ") { "?" }})", *it.toTypedArray())
         }

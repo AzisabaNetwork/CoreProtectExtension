@@ -51,7 +51,8 @@ class CommandManager(private val plugin: CoreProtectExtension) : TabExecutor {
             cmd.execute(sender, args.drop(1).toTypedArray())
         } catch (e: Exception) {
             sender.sendMessage("${ChatColor.RED}An error occurred while executing command.")
-            plugin.slF4JLogger.error("Failed to execute command from ${sender.name}: /$label ${args.joinToString(" ")}", e)
+            plugin.logger.severe("Failed to execute command from ${sender.name}: /$label ${args.joinToString(" ")}")
+            e.printStackTrace()
         }
         return true
     }
@@ -74,7 +75,8 @@ class CommandManager(private val plugin: CoreProtectExtension) : TabExecutor {
                 return cmd.suggest(sender, args.drop(1).toTypedArray())
             }
         } catch (e: Exception) {
-            plugin.slF4JLogger.error("Failed to suggest command to ${sender.name}: /$alias ${args.joinToString(" ")}", e)
+            plugin.logger.severe("Failed to suggest command to ${sender.name}: /$alias ${args.joinToString(" ")}")
+            e.printStackTrace()
             return emptyList()
         }
     }

@@ -18,15 +18,10 @@ java {
 
 repositories {
     mavenCentral()
-    maven {
-        name = "papermc-repo"
-        url = uri("https://papermc.io/repo/repository/maven-public/")
-    }
-    maven {
-        name = "azisaba-repo"
-        url = uri("https://repo.azisaba.net/repository/maven-public/")
-    }
-    maven { url = uri("https://maven.playpro.com/") }
+    maven("https://hub.spigotmc.org/nexus/content/repositories/public/")
+    maven("https://oss.sonatype.org/content/groups/public/")
+    maven("https://repo.azisaba.net/repository/maven-public/")
+    maven("https://maven.playpro.com/")
 }
 
 dependencies {
@@ -34,8 +29,10 @@ dependencies {
     implementation("org.yaml:snakeyaml:2.2")
     implementation("xyz.acrylicstyle.java-util:common:2.0.0-SNAPSHOT")
     implementation("xyz.acrylicstyle.java-util:reflector:2.0.0-SNAPSHOT")
+    implementation("org.mariadb.jdbc:mariadb-java-client:3.5.3")
+//    implementation("com.zaxxer:HikariCP:4.0.3")
     @Suppress("VulnerableLibrariesLocal", "RedundantSuppression")
-    compileOnly("com.destroystokyo.paper:paper-api:1.15.2-R0.1-SNAPSHOT")
+    compileOnly("org.spigotmc:spigot-api:1.15.2-R0.1-SNAPSHOT")
     compileOnly("net.coreprotect:coreprotect:22.2")
     testImplementation(kotlin("test"))
 }
@@ -63,6 +60,8 @@ tasks {
         relocate("org.snakeyaml", "net.azisaba.coreprotectextension.lib.org.snakeyaml")
         relocate("org.intellij", "net.azisaba.coreprotectextension.lib.org.intellij")
         relocate("xyz.acrylicstyle.util", "net.azisaba.coreprotectextension.lib.xyz.acrylicstyle.util")
+        relocate("org.mariadb", "net.azisaba.coreprotectextension.lib.org.mariadb")
+//        relocate("com.zaxxer", "net.azisaba.coreprotectextension.lib.com.zaxxer")
     }
 }
 

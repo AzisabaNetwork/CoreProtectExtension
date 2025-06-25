@@ -4,6 +4,8 @@ import net.azisaba.coreprotectextension.CoreProtectExtension
 import net.azisaba.coreprotectextension.database.CPDatabase
 import net.azisaba.coreprotectextension.util.Util
 import net.azisaba.coreprotectextension.util.Util.toComponent
+import net.md_5.bungee.api.ChatMessageType
+import net.md_5.bungee.api.chat.TextComponent
 import org.bukkit.Bukkit
 import org.bukkit.ChatColor
 import org.bukkit.Location
@@ -46,19 +48,20 @@ class InspectCommand(private val plugin: CoreProtectExtension) : Command {
             try {
                 val split = it.split(";")
                 Location(Bukkit.getWorld(split[0])!!, split[1].toDouble(), split[2].toDouble(), split[3].toDouble())
-            } catch (e: NullPointerException) {
+            } catch (_: NullPointerException) {
                 null
             }
         } ?: return toggleInspectMode(sender)
         if (location.distance(sender.location) > 5 && !sender.hasPermission("coreprotectextension.command.inspect.far")) {
-            return sender.sendActionBar("${ChatColor.RED}You are too far from provided location.")
+            return sender.spigot().sendMessage(ChatMessageType.ACTION_BAR, TextComponent("${ChatColor.RED}You are too far from provided location."))
         }
         Bukkit.getScheduler().runTaskAsynchronously(plugin, Runnable {
             var result = try {
                 CPDatabase.lookupContainer(origin = location, radius = -1, page = argPage, resultsPerPage = 10)
             } catch (e: Exception) {
                 sender.sendMessage("${ChatColor.RED}An error occurred while executing command.")
-                plugin.slF4JLogger.error("Failed to execute command from ${sender.name}: /cpe inspect ${args.joinToString(" ")}", e)
+                plugin.logger.severe("Failed to execute command from ${sender.name}: /cpe inspect ${args.joinToString(" ")}")
+                e.printStackTrace()
                 return@Runnable
             }
             if (result.data.isEmpty()) {
@@ -86,9 +89,8 @@ class InspectCommand(private val plugin: CoreProtectExtension) : Command {
                         CPDatabase.lookupContainer(origin = this, radius = -1, page = argPage, resultsPerPage = 10)
                     } catch (e: Exception) {
                         sender.sendMessage("${ChatColor.RED}An error occurred while executing command.")
-                        plugin.slF4JLogger.error(
-                            "Failed to execute command from ${sender.name}: /cpe inspect ${args.joinToString(" ")}", e
-                        )
+                        plugin.logger.severe("Failed to execute command from ${sender.name}: /cpe inspect ${args.joinToString(" ")}")
+                        e.printStackTrace()
                         return@run
                     }
                 }
@@ -99,7 +101,7 @@ class InspectCommand(private val plugin: CoreProtectExtension) : Command {
                         sender.inventory.addItem(result.data[getItem].getItemStack().apply { amount = 1 })
                     })
                 } else {
-                    sender.sendActionBar("${ChatColor.RED}You don't have permission.")
+                    sender.spigot().sendMessage(ChatMessageType.ACTION_BAR, TextComponent("${ChatColor.RED}You don't have permission."))
                 }
                 return@Runnable
             }

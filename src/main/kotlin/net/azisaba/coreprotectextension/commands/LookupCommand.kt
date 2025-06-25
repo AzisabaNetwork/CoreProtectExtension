@@ -7,6 +7,8 @@ import net.azisaba.coreprotectextension.model.LookupException
 import net.azisaba.coreprotectextension.util.NumberOperation
 import net.azisaba.coreprotectextension.util.Util
 import net.azisaba.coreprotectextension.util.Util.toComponent
+import net.md_5.bungee.api.ChatMessageType
+import net.md_5.bungee.api.chat.TextComponent
 import org.bukkit.Bukkit
 import org.bukkit.ChatColor
 import org.bukkit.Material
@@ -100,9 +102,8 @@ class LookupCommand(private val plugin: CoreProtectExtension) : Command {
                         return@Runnable
                     } catch (e: Exception) {
                         sender.sendMessage("${ChatColor.RED}An error occurred while executing command.")
-                        plugin.slF4JLogger.error(
-                            "Failed to execute command from ${sender.name}: /cpe lookup ${args.joinToString(" ")}", e
-                        )
+                        plugin.logger.severe("Failed to execute command from ${sender.name}: /cpe lookup ${args.joinToString(" ")}")
+                        e.printStackTrace()
                         return@Runnable
                     }
                     if (getItem != null) {
@@ -111,7 +112,7 @@ class LookupCommand(private val plugin: CoreProtectExtension) : Command {
                                 sender.inventory.addItem(result.data[getItem].getItemStack().apply { this.amount = 1 })
                             })
                         } else {
-                            sender.sendActionBar("${ChatColor.RED}You don't have permission.")
+                            sender.spigot().sendMessage(ChatMessageType.ACTION_BAR, TextComponent("${ChatColor.RED}You don't have permission."))
                         }
                         return@Runnable
                     }

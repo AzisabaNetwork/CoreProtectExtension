@@ -36,7 +36,7 @@ class PlayerListener(private val plugin: CoreProtectExtension) : Listener {
                     .getCommandOfType<InspectCommand>()
                     .execute(
                         e.player,
-                        arrayOf("location=${loc.world.name};${loc.blockX};${loc.blockY};${loc.blockZ}", "page=1"),
+                        arrayOf("location=${loc.world!!.name};${loc.blockX};${loc.blockY};${loc.blockZ}", "page=1"),
                     )
             }
         }
