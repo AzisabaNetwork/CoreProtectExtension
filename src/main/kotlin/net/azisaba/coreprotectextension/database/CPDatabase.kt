@@ -166,7 +166,7 @@ object CPDatabase {
     }
 
     private fun getLastPageIndex(queryBuilder: QueryBuilder, page: Int, resultsPerPage: Int) =
-        if (page < 1000000) {
+        if (false && page < 1000000) {
             queryBuilder.executeQuery { rs ->
                 if (rs.next()) {
                     page + rs.getInt(1) / resultsPerPage
@@ -240,7 +240,7 @@ object CPDatabase {
 
         queryBuilder.sql = "SELECT COUNT(*) FROM (SELECT 1 FROM `${ConfigHandler.prefix}item`"
         queryBuilder.suffix = "LIMIT ${resultsPerPage * 1000} OFFSET ${max(0, page) * resultsPerPage})"
-        return ContainerLookupResult(list, getLastPageIndex(queryBuilder, page, resultsPerPage))
+        return ContainerLookupResult(list, if (list.isEmpty()) 0 else getLastPageIndex(queryBuilder, page, resultsPerPage))
     }
 
     /**
@@ -298,6 +298,6 @@ object CPDatabase {
 
         queryBuilder.sql = "SELECT COUNT(*) FROM (SELECT 1 FROM `${ConfigHandler.prefix}container`"
         queryBuilder.suffix = "LIMIT ${resultsPerPage * 1000} OFFSET ${max(0, page) * resultsPerPage})"
-        return ContainerLookupResult(list, getLastPageIndex(queryBuilder, page, resultsPerPage))
+        return ContainerLookupResult(list, if (list.isEmpty()) 0 else getLastPageIndex(queryBuilder, page, resultsPerPage))
     }
 }
