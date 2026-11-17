@@ -1,7 +1,8 @@
 package net.azisaba.coreprotectextension.commands
 
 import net.azisaba.coreprotectextension.CoreProtectExtension
-import org.bukkit.ChatColor
+import net.kyori.adventure.text.Component
+import net.kyori.adventure.text.format.NamedTextColor
 import org.bukkit.command.CommandSender
 import org.bukkit.command.TabExecutor
 
@@ -34,23 +35,23 @@ class CommandManager(private val plugin: CoreProtectExtension) : TabExecutor {
             if (args.isEmpty()) {
                 commands.values.distinct().sortedBy { it.name }.forEach { cmd ->
                     if (sender.hasPermission("coreprotectextension.command.${cmd.name}")) {
-                        sender.sendMessage("${ChatColor.GOLD}${cmd.fullUsage} ${ChatColor.GRAY}- ${ChatColor.AQUA}${cmd.summary}")
+                        sender.sendRichMessage("<gold>${cmd.fullUsage}<gray> - <aqua>${cmd.summary}")
                     }
                 }
                 return true
             }
             val cmd = commands[args[0].lowercase()]
             if (cmd == null || cmd.name.startsWith("*")) {
-                sender.sendMessage("${ChatColor.RED}Invalid sub command: ${args[0]}")
+                sender.sendMessage(Component.text("Invalid sub command: ${args[0]}", NamedTextColor.RED))
                 return true
             }
             if (!sender.hasPermission("coreprotectextension.command.${cmd.name}")) {
-                sender.sendMessage("${ChatColor.RED}You do not have permission to do this.")
+                sender.sendMessage(Component.text("You do not have permission to do this.", NamedTextColor.RED))
                 return true
             }
             cmd.execute(sender, args.drop(1).toTypedArray())
         } catch (e: Exception) {
-            sender.sendMessage("${ChatColor.RED}An error occurred while executing command.")
+            sender.sendMessage(Component.text("An error occurred while executing command.", NamedTextColor.RED))
             plugin.logger.severe("Failed to execute command from ${sender.name}: /$label ${args.joinToString(" ")}")
             e.printStackTrace()
         }

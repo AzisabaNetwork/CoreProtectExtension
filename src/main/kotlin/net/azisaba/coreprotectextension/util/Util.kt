@@ -1,13 +1,22 @@
 package net.azisaba.coreprotectextension.util
 
+import io.papermc.paper.adventure.AdventureComponent
+import io.papermc.paper.adventure.PaperAdventure
 import net.azisaba.coreprotectextension.config.PluginConfig
 import net.azisaba.coreprotectextension.database.CPDatabase
+import net.azisaba.coreprotectextension.model.ContainerLog
 import net.azisaba.coreprotectextension.model.ContainerLookupResult
-import net.md_5.bungee.api.chat.ClickEvent
-import net.md_5.bungee.api.chat.HoverEvent
-import net.md_5.bungee.api.chat.TextComponent
+import net.kyori.adventure.text.Component
+import net.kyori.adventure.text.event.ClickEvent
+import net.kyori.adventure.text.event.HoverEvent
+import net.kyori.adventure.text.format.NamedTextColor
+import net.kyori.adventure.text.format.TextColor
+import net.kyori.adventure.text.format.TextDecoration
+import net.minecraft.ChatFormatting
+import net.minecraft.network.chat.Component as MinecraftComponent
 import org.bukkit.Bukkit
-import org.bukkit.ChatColor
+import org.bukkit.craftbukkit.entity.CraftPlayer
+import org.bukkit.craftbukkit.inventory.CraftItemStack
 import org.bukkit.entity.Player
 import org.bukkit.inventory.ItemStack
 import org.bukkit.plugin.Plugin
@@ -20,7 +29,6 @@ import java.time.Instant
 import java.time.LocalDateTime
 import java.util.*
 import java.util.concurrent.CompletableFuture
-import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.min
 
@@ -122,8 +130,8 @@ object Util {
         return value
     }
 
-    fun InvalidArgumentException.toComponent(): TextComponent {
-        val errorComponent = TextComponent("${ChatColor.RED}Invalid syntax: $message")
+    fun InvalidArgumentException.toComponent(): Component {
+        val errorComponent = Component.text("Invalid syntax: $message", NamedTextColor.RED)
         val context = this.context ?: return errorComponent
         val prev = context.peekWithAmount(-min(context.index(), 15))
         var next = context.peekWithAmount(
@@ -135,17 +143,15 @@ object Util {
         if (next.isEmpty()) {
             next = " ".repeat(length)
         }
-        val c = TextComponent("")
-        c.addExtra(errorComponent)
-        c.addExtra(TextComponent("\n"))
-        c.addExtra(TextComponent(prev).apply { color = ChatColor.WHITE.asBungee() })
         val left = next.substring(0, length)
         val right = next.substring(length, next.length)
-        val problem = TextComponent(left).apply { color = ChatColor.RED.asBungee() }
-        problem.isUnderlined = true
-        c.addExtra(problem)
-        c.addExtra(TextComponent(right).apply { color = ChatColor.WHITE.asBungee() })
-        return c
+        val problem = Component.text(left, NamedTextColor.RED).decorate(TextDecoration.UNDERLINED)
+        return Component.empty()
+            .append(errorComponent)
+            .append(Component.newline())
+            .append(Component.text(prev, NamedTextColor.WHITE))
+            .append(problem)
+            .append(Component.text(right, NamedTextColor.WHITE))
     }
 
     fun LocalDateTime.getTimeSince(current: LocalDateTime): String {
@@ -166,19 +172,12 @@ object Util {
 
     fun LocalDateTime.toInstant(): Instant = this.toInstant(PluginConfig.instance.getZoneOffsetAt(this))
 
-    private fun getServerImplVersion() = Bukkit.getServer().javaClass.name.split('.')[3]
+    fun ItemStack.asNMSCopy(): net.minecraft.world.item.ItemStack = CraftItemStack.asNMSCopy(this)
 
-    fun ItemStack.asNMSCopy(): Any =
-        Class.forName("org.bukkit.craftbukkit.${getServerImplVersion()}.inventory.CraftItemStack")
-            .getMethod("asNMSCopy", ItemStack::class.java)
-            .invoke(null, this)
-
-    fun ItemStack.getSNBT(): String? {
-        val nms = asNMSCopy()
-        val tagField = nms.javaClass.declaredFields.find { it.type.simpleName == "NBTTagCompound" || it.type.simpleName == "CompoundTag" }
-            ?: error("Could not find tag field")
-        tagField.isAccessible = true
-        return tagField.get(nms)?.toString()
+    fun ItemStack.trySerializeAsBytes() = try {
+        serializeAsBytes()
+    } catch (_: Exception) {
+        ByteArray(0)
     }
 
     fun sendResults(
@@ -192,105 +191,184 @@ object Util {
         val now = LocalDateTime.now()
         sender.sendMessage("----------------------------------------")
         result.data.forEachIndexed { index, log ->
-            val text = TextComponent()
-            val time = TextComponent("${log.time.getTimeSince(now)} ago ")
-                .apply { color = ChatColor.GRAY.asBungee() }
-            time.hoverEvent = HoverEvent(HoverEvent.Action.SHOW_TEXT, TextComponent.fromLegacyText(formats[0].format(log.time.toInstant().toEpochMilli())))
-            val user = TextComponent("${log.user.name} ")
-                .apply { color = ChatColor.entries[3 + abs(log.user.name.hashCode() * 3) % 12].asBungee() }
-            user.hoverEvent = HoverEvent(HoverEvent.Action.SHOW_TEXT, TextComponent.fromLegacyText(log.user.uuid.toString()))
-            val amount = TextComponent(*TextComponent.fromLegacyText("§${log.action.color}${log.action.short}${log.amount} "))
+//            val time = MinecraftComponent.literal("${log.time.getTimeSince(now)} ago ")
+//                .withStyle(ChatFormatting.GRAY)
+//                .withStyle { style ->
+//                    style.withHoverEvent(
+//                        net.minecraft.network.chat.HoverEvent.ShowText(
+//                            MinecraftComponent.literal(
+//                                formats[0].format(log.time.toInstant().toEpochMilli())
+//                            )
+//                        )
+//                    )
+//                }
+//            val user = MinecraftComponent.literal("${log.user.name} ")
+//                .withColor(log.user.name.hashCode().and(0xFFFFFF))
+//                .withStyle { style ->
+//                    style.withHoverEvent(
+//                        net.minecraft.network.chat.HoverEvent.ShowText(
+//                            MinecraftComponent.literal(
+//                                log.user.uuid.toString()
+//                            )
+//                        )
+//                    ).withClickEvent(net.minecraft.network.chat.ClickEvent.CopyToClipboard(log.user.uuid.toString()))
+//                }
+//            val amount = MinecraftComponent.literal("${log.action.short}${log.amount} ")
+//                .withStyle(if (log.action == ContainerLog.Action.ADDED) ChatFormatting.GREEN else ChatFormatting.RED)
+//            val itemStack = log.getItemStack()
+//            val itemName = if (itemStack.itemMeta?.hasCustomName() == true) {
+//                MinecraftComponent.empty()
+//                    .append(PaperAdventure.asVanilla(itemStack.itemMeta!!.customName()!!))
+//            } else {
+//                MinecraftComponent.empty()
+//                    .append(PaperAdventure.asVanilla(Component.translatable(itemStack)))
+//            }.append(MinecraftComponent.literal(" (${log.type.name.lowercase()})").withStyle(ChatFormatting.DARK_GRAY))
+//                .withStyle { style ->
+//                    style.withHoverEvent(net.minecraft.network.chat.HoverEvent.ShowItem(itemStack.asNMSCopy()))
+//                        .withClickEvent(net.minecraft.network.chat.ClickEvent.RunCommand("$commandWithoutPage page=${pageIndex + 1} getitemindex=${index}"))
+//                }
+//            if (log.rolledBack) {
+//                (sender as CraftPlayer).handle.sendSystemMessage(
+//                    MinecraftComponent.empty()
+//                        .append(time)
+//                        .append(user)
+//                        .append(amount.withStyle(ChatFormatting.STRIKETHROUGH))
+//                        .append(itemName.withStyle(ChatFormatting.STRIKETHROUGH)))
+//            } else {
+//                (sender as CraftPlayer).handle.sendSystemMessage(
+//                    MinecraftComponent.empty()
+//                        .append(time)
+//                        .append(user)
+//                        .append(amount)
+//                        .append(itemName))
+//            }
+            val time = Component.text("${log.time.getTimeSince(now)} ago ", NamedTextColor.GRAY)
+                .hoverEvent(HoverEvent.showText(Component.text(formats[0].format(log.time.toInstant().toEpochMilli()))))
+            val user = Component.text("${log.user.name} ", TextColor.color(log.user.name.hashCode().and(0xFFFFFF)))
+                .hoverEvent(HoverEvent.showText(Component.text(log.user.uuid.toString())))
+            val amount = Component.text("${log.action.short}${log.amount} ", log.action.color)
             val itemStack = log.getItemStack()
-            val itemName = if (itemStack.itemMeta?.hasDisplayName() == true) {
-                "${itemStack.itemMeta!!.displayName} ${ChatColor.DARK_GRAY}(${log.type.name.lowercase()})"
+            val itemName = if (itemStack.itemMeta?.hasCustomName() == true) {
+                Component.empty()
+                    .append(itemStack.itemMeta!!.customName()!!)
+                    .append(Component.text(" (${log.type.name.lowercase()})", NamedTextColor.DARK_GRAY))
             } else {
-                log.type.name.lowercase()
+                Component.empty()
+                    .append(Component.translatable(itemStack))
+                    .append(Component.text(" (${log.type.name.lowercase()})", NamedTextColor.DARK_GRAY))
             }
-            val item = TextComponent(*TextComponent.fromLegacyText(itemName)).apply { color = ChatColor.AQUA.asBungee() }
-            val tag = "{\"id\":\"minecraft:${log.type.name.lowercase()}\",Count:${log.amount},tag:${itemStack.getSNBT()}}"
-            if (tag.toByteArray().size < 260000) {
-                item.hoverEvent = HoverEvent(HoverEvent.Action.SHOW_ITEM, arrayOf(TextComponent(tag)))
-            } else if (itemStack.itemMeta?.hasDisplayName() == true) {
-                item.hoverEvent = HoverEvent(
-                    HoverEvent.Action.SHOW_TEXT, TextComponent.fromLegacyText(
-                    itemStack.itemMeta!!.displayName + "\n§7§o(Item data is too big to be shown)\n" +
-                            "§7§o(You can click here to obtain the actual item, but you do so at §c§oyour own risk§7§o)"
-                ))
+            val item = when {
+                itemStack.trySerializeAsBytes().size < 260000 -> {
+                    itemName.hoverEvent(
+                        HoverEvent.showItem(
+                            itemStack.type,
+                            1,
+                            PaperAdventure.asAdventure(itemStack.asNMSCopy().componentsPatch)
+                        )
+                    )
+                }
+
+                itemStack.itemMeta?.hasCustomName() == true -> {
+                    itemName.hoverEvent(
+                        itemStack.itemMeta!!.customName()!!
+                            .append(
+                                Component.text("(Item data is too big to be shown)", NamedTextColor.GRAY)
+                                    .decorate(TextDecoration.ITALIC)
+                            )
+                            .append(
+                                Component.text(
+                                    "(You can click here to obtain the actual item, but you do so at your own risk)",
+                                    NamedTextColor.RED
+                                )
+                                    .decorate(TextDecoration.ITALIC)
+                            )
+                    )
+                }
+
+                else -> {
+                    itemName.hoverEvent(
+                        Component.text("(Item data is too big to be shown)", NamedTextColor.GRAY)
+                            .decorate(TextDecoration.ITALIC)
+                            .append(
+                                Component.text(
+                                    "(You can click here to obtain the actual item, but you do so at your own risk)",
+                                    NamedTextColor.RED
+                                )
+                                    .decorate(TextDecoration.ITALIC)
+                            )
+                    )
+                }
+            }.clickEvent(ClickEvent.callback {
+                sender.inventory.addItem(itemStack)
+            })
+            //item.clickEvent = ClickEvent(ClickEvent.Action.RUN_COMMAND, "$commandWithoutPage page=${pageIndex + 1} getitemindex=${index}")
+            val text = if (log.rolledBack) {
+                Component.empty()
+                    .append(time)
+                    .append(user)
+                    .append(amount.decorate(TextDecoration.STRIKETHROUGH))
+                    .append(item.decorate(TextDecoration.STRIKETHROUGH))
             } else {
-                item.hoverEvent = HoverEvent(
-                    HoverEvent.Action.SHOW_TEXT, TextComponent.fromLegacyText(
-                    "§7§o(Item data is too big to be shown)\n" +
-                            "§7§o(You can click here to obtain the actual item, but you do so at §c§oyour own risk§7§o)"
-                ))
+                Component.empty().append(time).append(user).append(amount).append(item)
             }
-            item.clickEvent = ClickEvent(ClickEvent.Action.RUN_COMMAND, "$commandWithoutPage page=${pageIndex + 1} getitemindex=${index}")
-            text.addExtra(time)
-            text.addExtra(user)
-            text.addExtra(amount)
-            text.addExtra(item)
-            if (log.rolledBack) {
-                amount.isStrikethrough = true
-                item.isStrikethrough = true
-                text.isStrikethrough = true
-            }
-            sender.spigot().sendMessage(text)
+            sender.sendMessage(text)
             if (showLocation) {
-                val location = TextComponent(
-                    " §r §r §r §r §r §r §r §r §r §r §r §r §r §r §7 ^ §o(x${log.x}/y${log.y}/z${log.z}/${CPDatabase.getWorldName(log.worldId)})"
-                )
-                location.clickEvent = ClickEvent(
-                    ClickEvent.Action.RUN_COMMAND,
-                    "/co teleport wid:${log.worldId} ${log.x + 0.5} ${log.y} ${log.z + 0.5}",
-                )
-                sender.spigot().sendMessage(location)
+                val location =
+                    Component.text("                ^ (x${log.x}/y${log.y}/z${log.z}/${CPDatabase.getWorldName(log.worldId)})", NamedTextColor.GRAY)
+                        .decorate(TextDecoration.ITALIC)
+                        .clickEvent(ClickEvent.runCommand("/co teleport wid:${log.worldId} ${log.x + 0.5} ${log.y} ${log.z + 0.5}"))
+                sender.sendMessage(location)
             }
         }
-        val navigation = TextComponent()
-        val first = TextComponent("First ")
-        if (pageIndex > 0) {
-            first.hoverEvent = HoverEvent(HoverEvent.Action.SHOW_TEXT, TextComponent.fromLegacyText("<< First page"))
-            first.clickEvent = ClickEvent(ClickEvent.Action.RUN_COMMAND, "$commandWithoutPage page=1")
+        val first = if (pageIndex > 0) {
+            Component.text("First")
+                .hoverEvent(HoverEvent.showText(Component.text("<< First page")))
+                .clickEvent(ClickEvent.runCommand("$commandWithoutPage page=1"))
         } else {
-            first.color = ChatColor.DARK_GRAY.asBungee()
+            Component.text("First", NamedTextColor.DARK_GRAY)
         }
-        val back = TextComponent("<< ")
-        if (pageIndex > 0) {
-            back.hoverEvent = HoverEvent(HoverEvent.Action.SHOW_TEXT, TextComponent.fromLegacyText("<< Previous page"))
-            back.clickEvent = ClickEvent(ClickEvent.Action.RUN_COMMAND, "$commandWithoutPage page=$pageIndex")
+        val back = if (pageIndex > 0) {
+            Component.text(" << ")
+                .hoverEvent(HoverEvent.showText(Component.text("<< Previous page")))
+                .clickEvent(ClickEvent.runCommand("$commandWithoutPage page=$pageIndex"))
         } else {
-            back.color = ChatColor.DARK_GRAY.asBungee()
+            Component.text(" << ", NamedTextColor.DARK_GRAY)
         }
-        val next = TextComponent(" >> ")
-        if ((result.lastPageIndex >= 0 && result.lastPageIndex > pageIndex) || (result.lastPageIndex < 0 && result.data.size == resultsPerPage)) {
-            next.hoverEvent = HoverEvent(HoverEvent.Action.SHOW_TEXT, TextComponent.fromLegacyText("Next page >>"))
-            next.clickEvent = ClickEvent(ClickEvent.Action.RUN_COMMAND, "$commandWithoutPage page=${pageIndex + 2}")
+        val next = if ((result.lastPageIndex >= 0 && result.lastPageIndex > pageIndex) || (result.lastPageIndex < 0 && result.data.size == resultsPerPage)) {
+            Component.text(" >> ")
+                .hoverEvent(HoverEvent.showText(Component.text("Next page >>")))
+                .clickEvent(ClickEvent.runCommand("$commandWithoutPage page=${pageIndex + 2}"))
         } else {
-            next.color = ChatColor.DARK_GRAY.asBungee()
+            Component.text(" >> ", NamedTextColor.DARK_GRAY)
         }
-        val last = TextComponent("Last")
-        if (result.lastPageIndex > pageIndex) {
-            last.hoverEvent = HoverEvent(HoverEvent.Action.SHOW_TEXT, TextComponent.fromLegacyText("Last page >>"))
-            last.clickEvent =
-                ClickEvent(ClickEvent.Action.RUN_COMMAND, "$commandWithoutPage page=${result.lastPageIndex + 1}")
+        val last = if (result.lastPageIndex > pageIndex) {
+            Component.text("Last")
+                .hoverEvent(HoverEvent.showText(Component.text("Last page >>")))
+                .clickEvent(ClickEvent.runCommand("$commandWithoutPage page=${result.lastPageIndex + 1}"))
         } else if (result.lastPageIndex >= 0) {
-            last.color = ChatColor.DARK_GRAY.asBungee()
+            Component.text("Last", NamedTextColor.DARK_GRAY)
         } else {
-            last.hoverEvent = HoverEvent(HoverEvent.Action.SHOW_TEXT, TextComponent.fromLegacyText("Page data not available"))
-            last.color = ChatColor.DARK_GRAY.asBungee()
+            Component.text("Last", NamedTextColor.DARK_GRAY)
+                .hoverEvent(HoverEvent.showText(Component.text("Page data not available")))
         }
         val current = if (result.lastPageIndex == -1) {
-            TextComponent(" ${ChatColor.GRAY}| ${ChatColor.WHITE}Page ${ChatColor.AQUA}${pageIndex + 1}")
+            Component.text(" | ", NamedTextColor.GRAY)
+                .append(Component.text("Page ", NamedTextColor.WHITE))
+                .append(Component.text("${pageIndex + 1}", NamedTextColor.AQUA))
         } else {
-            TextComponent(" ${ChatColor.GRAY}| ${ChatColor.WHITE}Page ${ChatColor.AQUA}${pageIndex + 1}${ChatColor.WHITE}/${ChatColor.AQUA}${result.lastPageIndex + 1}")
-        }
-        current.hoverEvent = HoverEvent(HoverEvent.Action.SHOW_TEXT, TextComponent.fromLegacyText("Click to select page"))
-        current.clickEvent = ClickEvent(ClickEvent.Action.SUGGEST_COMMAND, "$commandWithoutPage page=")
-        navigation.addExtra(first)
-        navigation.addExtra(back)
-        navigation.addExtra(next)
-        navigation.addExtra(last)
-        navigation.addExtra(current)
-        sender.spigot().sendMessage(navigation)
+            Component.text(" | ", NamedTextColor.GRAY)
+                .append(Component.text("Page ", NamedTextColor.WHITE))
+                .append(Component.text("${pageIndex + 1}", NamedTextColor.AQUA))
+                .append(Component.text("/", NamedTextColor.WHITE))
+                .append(Component.text("${result.lastPageIndex + 1}", NamedTextColor.AQUA))
+        }.hoverEvent(HoverEvent.showText(Component.text("Click to select page")))
+            .clickEvent(ClickEvent.suggestCommand("$commandWithoutPage page="))
+        sender.sendMessage(Component.empty()
+            .append(first)
+            .append(back)
+            .append(next)
+            .append(last)
+            .append(current))
     }
 
     fun <R> runInMain(plugin: Plugin, action: () -> R): R =

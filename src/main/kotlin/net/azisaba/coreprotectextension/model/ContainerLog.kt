@@ -1,6 +1,8 @@
 package net.azisaba.coreprotectextension.model
 
-import net.coreprotect.database.Rollback
+import net.coreprotect.database.rollback.Rollback
+import net.kyori.adventure.text.format.NamedTextColor
+import net.kyori.adventure.text.format.TextColor
 import org.bukkit.Material
 import org.bukkit.inventory.ItemStack
 import java.time.LocalDateTime
@@ -19,9 +21,9 @@ data class ContainerLog(
     val action: Action,
     val rolledBack: Boolean,
 ) {
-    enum class Action(val color: Char, val short: Char) {
-        REMOVED('c', '-'),
-        ADDED('a', '+')
+    enum class Action(val color: TextColor, val short: Char) {
+        REMOVED(NamedTextColor.RED, '-'),
+        ADDED(NamedTextColor.GREEN, '+')
     }
 
     fun getItemStack() = ItemStack(type, amount).let { Rollback.populateItemStack(it, metadata)[2] as ItemStack }

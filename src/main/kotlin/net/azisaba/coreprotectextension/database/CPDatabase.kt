@@ -11,6 +11,7 @@ import net.azisaba.coreprotectextension.util.NumberOperation
 import net.coreprotect.config.ConfigHandler
 import net.coreprotect.hikari.HikariConfig
 import net.coreprotect.hikari.HikariDataSource
+import net.coreprotect.utility.MaterialUtils
 import net.coreprotect.utility.Util
 import org.bukkit.Location
 import org.bukkit.Material
@@ -27,8 +28,6 @@ object CPDatabase {
     val dataSource by lazy {
         val config = HikariConfig()
         ConfigHandler.hikariDataSource.copyStateTo(config)
-        config.driverClassName = "net.azisaba.coreprotectextension.lib.org.mariadb.jdbc.Driver"
-        config.jdbcUrl = config.jdbcUrl.replace("jdbc:mysql://", "jdbc:mariadb://")
         HikariDataSource(config)
     }
 
@@ -121,12 +120,12 @@ object CPDatabase {
     private fun fillQueryBuilderIncludeExcludeItems(queryBuilder: QueryBuilder, include: String?, exclude: String?) {
         include?.split(",")
             ?.flatMap { matchMaterials(it.toRegex(RegexOption.IGNORE_CASE)) }
-            ?.joinToString(" OR ") { "type = " + Util.getMaterialId(it) }
+            ?.joinToString(" OR ") { "type = " + MaterialUtils.getBlockId(it) }
                 ?.let { queryBuilder.addWhere(it) }
         exclude?.split(",")?.flatMap { entry ->
             mutableListOf<String>().also { list ->
                 try {
-                    list += matchMaterials(entry.toRegex(RegexOption.IGNORE_CASE)).map { "type != " + Util.getMaterialId(it) }
+                    list += matchMaterials(entry.toRegex(RegexOption.IGNORE_CASE)).map { "type != " + MaterialUtils.getBlockId(it) }
                 } catch (_: IllegalArgumentException) {}
                 getUserByName(entry)?.id?.let { list += listOf("user != $it") }
             }
@@ -227,7 +226,7 @@ object CPDatabase {
                             rs.getInt("x"),
                             rs.getInt("y"),
                             rs.getInt("z"),
-                            Util.getType(rs.getInt("type")),
+                            MaterialUtils.getType(rs.getInt("type")),
                             rs.getInt("amount"),
                             rs.getBytes("data"),
                             action,
@@ -286,7 +285,7 @@ object CPDatabase {
                         rs.getInt("x"),
                         rs.getInt("y"),
                         rs.getInt("z"),
-                        Util.getType(rs.getInt("type")),
+                        MaterialUtils.getType(rs.getInt("type")),
                         rs.getInt("amount"),
                         rs.getBytes("metadata"),
                         ContainerLog.Action.entries[rs.getInt("action")],

@@ -4,10 +4,9 @@ import net.azisaba.coreprotectextension.CoreProtectExtension
 import net.azisaba.coreprotectextension.database.CPDatabase
 import net.azisaba.coreprotectextension.util.Util
 import net.azisaba.coreprotectextension.util.Util.toComponent
-import net.md_5.bungee.api.ChatMessageType
-import net.md_5.bungee.api.chat.TextComponent
+import net.kyori.adventure.text.Component
+import net.kyori.adventure.text.format.NamedTextColor
 import org.bukkit.Bukkit
-import org.bukkit.ChatColor
 import org.bukkit.Location
 import org.bukkit.block.Chest
 import org.bukkit.block.DoubleChest
@@ -15,7 +14,7 @@ import org.bukkit.command.CommandSender
 import org.bukkit.entity.Player
 import xyz.acrylicstyle.util.ArgumentParserBuilder
 import xyz.acrylicstyle.util.InvalidArgumentException
-import java.util.UUID
+import java.util.*
 import kotlin.math.max
 
 class InspectCommand(private val plugin: CoreProtectExtension) : Command {
@@ -32,15 +31,15 @@ class InspectCommand(private val plugin: CoreProtectExtension) : Command {
 
     override fun execute(sender: CommandSender, args: Array<String>) {
         if (sender !is Player) {
-            return sender.sendMessage("${ChatColor.RED}This command must be executed by the player.")
+            return sender.sendMessage(Component.text("This command must be executed by the player.", NamedTextColor.RED))
         }
         if (!sender.hasPermission("coreprotectextension.inspect")) {
-            return sender.sendMessage("${ChatColor.RED}You need coreprotectextension.inspect to use this feature.")
+            return sender.sendMessage(Component.text("You need coreprotectextension.inspect to use this feature.", NamedTextColor.RED))
         }
         val arguments = try {
             parser.parse(args.joinToString(" "))
         } catch (e: InvalidArgumentException) {
-            return sender.spigot().sendMessage(e.toComponent())
+            return sender.sendMessage(e.toComponent())
         }
         val getItem = arguments.getArgument("getitemindex")?.toInt()
         val argPage = max(1, arguments.getArgument("page")?.toIntOrNull() ?: return toggleInspectMode(sender)) - 1
@@ -53,13 +52,14 @@ class InspectCommand(private val plugin: CoreProtectExtension) : Command {
             }
         } ?: return toggleInspectMode(sender)
         if (location.distance(sender.location) > 5 && !sender.hasPermission("coreprotectextension.command.inspect.far")) {
-            return sender.spigot().sendMessage(ChatMessageType.ACTION_BAR, TextComponent("${ChatColor.RED}You are too far from provided location."))
+            sender.sendActionBar(Component.text("You are too far from provided location.", NamedTextColor.RED))
+            return
         }
         Bukkit.getScheduler().runTaskAsynchronously(plugin, Runnable {
             var result = try {
                 CPDatabase.lookupContainer(origin = location, radius = -1, page = argPage, resultsPerPage = 10)
             } catch (e: Exception) {
-                sender.sendMessage("${ChatColor.RED}An error occurred while executing command.")
+                sender.sendMessage(Component.text("An error occurred while executing command.", NamedTextColor.RED))
                 plugin.logger.severe("Failed to execute command from ${sender.name}: /cpe inspect ${args.joinToString(" ")}")
                 e.printStackTrace()
                 return@Runnable
@@ -88,7 +88,7 @@ class InspectCommand(private val plugin: CoreProtectExtension) : Command {
                     result = try {
                         CPDatabase.lookupContainer(origin = this, radius = -1, page = argPage, resultsPerPage = 10)
                     } catch (e: Exception) {
-                        sender.sendMessage("${ChatColor.RED}An error occurred while executing command.")
+                        sender.sendMessage(Component.text("An error occurred while executing command.", NamedTextColor.RED))
                         plugin.logger.severe("Failed to execute command from ${sender.name}: /cpe inspect ${args.joinToString(" ")}")
                         e.printStackTrace()
                         return@run
@@ -101,7 +101,7 @@ class InspectCommand(private val plugin: CoreProtectExtension) : Command {
                         sender.inventory.addItem(result.data[getItem].getItemStack().apply { amount = 1 })
                     })
                 } else {
-                    sender.spigot().sendMessage(ChatMessageType.ACTION_BAR, TextComponent("${ChatColor.RED}You don't have permission."))
+                    sender.sendActionBar(Component.text("You don't have permission.", NamedTextColor.RED))
                 }
                 return@Runnable
             }
@@ -112,10 +112,10 @@ class InspectCommand(private val plugin: CoreProtectExtension) : Command {
 
     private fun toggleInspectMode(player: Player) {
         if (inspectMode.remove(player.uniqueId)) {
-            player.sendMessage("${ChatColor.GOLD}Inspect mode is now disabled.")
+            player.sendMessage(Component.text("Inspect mode is now disabled.", NamedTextColor.GOLD))
         } else {
             inspectMode.add(player.uniqueId)
-            player.sendMessage("${ChatColor.GOLD}Inspect mode is now enabled.")
+            player.sendMessage(Component.text("Inspect mode is now enabled.", NamedTextColor.GOLD))
         }
     }
 

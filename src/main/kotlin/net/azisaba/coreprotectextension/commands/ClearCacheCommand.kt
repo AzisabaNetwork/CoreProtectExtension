@@ -1,7 +1,8 @@
 package net.azisaba.coreprotectextension.commands
 
 import net.azisaba.coreprotectextension.database.CPDatabase
-import org.bukkit.ChatColor
+import net.kyori.adventure.text.Component
+import net.kyori.adventure.text.format.NamedTextColor
 import org.bukkit.command.CommandSender
 
 object ClearCacheCommand : Command {
@@ -10,6 +11,6 @@ object ClearCacheCommand : Command {
     override fun execute(sender: CommandSender, args: Array<String>) {
         CPDatabase.userCache.clear()
         CPDatabase.negativeUserCache.clear()
-        sender.sendMessage("${ChatColor.GREEN}Cleared user cache")
+        sender.sendMessage(Component.text("Cleared user cache", NamedTextColor.GREEN))
     }
 }

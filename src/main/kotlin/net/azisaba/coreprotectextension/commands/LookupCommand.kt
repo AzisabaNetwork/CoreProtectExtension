@@ -7,10 +7,9 @@ import net.azisaba.coreprotectextension.model.LookupException
 import net.azisaba.coreprotectextension.util.NumberOperation
 import net.azisaba.coreprotectextension.util.Util
 import net.azisaba.coreprotectextension.util.Util.toComponent
-import net.md_5.bungee.api.ChatMessageType
-import net.md_5.bungee.api.chat.TextComponent
+import net.kyori.adventure.text.Component
+import net.kyori.adventure.text.format.NamedTextColor
 import org.bukkit.Bukkit
-import org.bukkit.ChatColor
 import org.bukkit.Material
 import org.bukkit.command.CommandSender
 import org.bukkit.entity.Player
@@ -25,7 +24,7 @@ class LookupCommand(private val plugin: CoreProtectExtension) : Command {
     override val name = "lookup"
     override val summary = "Lookup container logs by arguments."
     override val description = "$summary \"time:(time)\" in CoreProtect is \"after=(time)\" in CoreProtectExtension."
-    override val usage = listOf("<action=> [user=] [radius=] [page=] [before=] [after=] [include=] [exclude=] [amount=]")
+    override val usage = listOf("(action=) [user=] [radius=] [page=] [before=] [after=] [include=] [exclude=] [amount=]")
     private val params = listOf("action=", "user=", "radius=", "page=", "before=", "after=", "include=", "exclude=", "amount=")
 
     override fun execute(sender: CommandSender, args: Array<String>) {
@@ -45,22 +44,22 @@ class LookupCommand(private val plugin: CoreProtectExtension) : Command {
 
         fun execute(plugin: CoreProtectExtension, sender: CommandSender, args: Array<String>, user: String? = null, subcommand: String = "lookup"): CompletableFuture<Void> {
             if (sender !is Player) {
-                sender.sendMessage("${ChatColor.RED}This command must be executed by the player.")
+                sender.sendMessage(Component.text("This command must be executed by the player.", NamedTextColor.RED))
                 return CompletableFuture.completedFuture(null)
             }
             val arguments = try {
                 parser.parse(args.joinToString(" "))
             } catch (e: InvalidArgumentException) {
-                sender.spigot().sendMessage(e.toComponent())
+                sender.sendMessage(e.toComponent())
                 return CompletableFuture.completedFuture(null)
             }
             val action = arguments.getArgument("action")
                 ?: run {
-                    sender.sendMessage("${ChatColor.RED}Action must be provided.")
+                    sender.sendMessage(Component.text("Action must be provided.", NamedTextColor.RED))
                     return CompletableFuture.completedFuture(null)
                 }
             if (action !in validActions) {
-                sender.sendMessage("${ChatColor.RED}Invalid action: $action")
+                sender.sendMessage(Component.text("Invalid action: $action", NamedTextColor.RED))
                 return CompletableFuture.completedFuture(null)
             }
             val getItem = arguments.getArgument("getitemindex")?.toInt()
@@ -70,14 +69,14 @@ class LookupCommand(private val plugin: CoreProtectExtension) : Command {
             val after = arguments.getArgument("after")?.let {
                 try {
                     System.currentTimeMillis() - Util.processTime(it)
-                } catch (e: Exception) {
+                } catch (_: Exception) {
                     Util.parseDateTime(it)
                 }
             }?.let { Instant.ofEpochMilli(it) }
             val before = arguments.getArgument("before")?.let {
                 try {
                     System.currentTimeMillis() - Util.processTime(it)
-                } catch (e: Exception) {
+                } catch (_: Exception) {
                     Util.parseDateTime(it)
                 }
             }?.let { Instant.ofEpochMilli(it) }
@@ -98,10 +97,10 @@ class LookupCommand(private val plugin: CoreProtectExtension) : Command {
                             else -> error("Invalid action: $action")
                         }
                     } catch (e: LookupException) {
-                        sender.sendMessage("${ChatColor.RED}${e.message}")
+                        sender.sendMessage(Component.text(e.message ?: "null", NamedTextColor.RED))
                         return@Runnable
                     } catch (e: Exception) {
-                        sender.sendMessage("${ChatColor.RED}An error occurred while executing command.")
+                        sender.sendMessage(Component.text("An error occurred while executing command.", NamedTextColor.RED))
                         plugin.logger.severe("Failed to execute command from ${sender.name}: /cpe lookup ${args.joinToString(" ")}")
                         e.printStackTrace()
                         return@Runnable
@@ -112,7 +111,7 @@ class LookupCommand(private val plugin: CoreProtectExtension) : Command {
                                 sender.inventory.addItem(result.data[getItem].getItemStack().apply { this.amount = 1 })
                             })
                         } else {
-                            sender.spigot().sendMessage(ChatMessageType.ACTION_BAR, TextComponent("${ChatColor.RED}You don't have permission."))
+                            sender.sendActionBar(Component.text("You don't have permission.", NamedTextColor.RED))
                         }
                         return@Runnable
                     }

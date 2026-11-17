@@ -1,16 +1,17 @@
 import org.apache.tools.ant.filters.ReplaceTokens
 
 plugins {
-    kotlin("jvm") version "1.9.0"
-    kotlin("plugin.serialization") version "1.9.0"
-    id("com.github.johnrengelman.shadow") version "8.1.1"
+    kotlin("jvm") version "2.4.21"
+    kotlin("plugin.serialization") version "2.4.21"
+    id("com.gradleup.shadow") version "9.6.1"
+    id("io.papermc.paperweight.userdev") version "2.0.0-beta.24"
 }
 
 group = "net.azisaba"
 version = "1.0.0-SNAPSHOT"
 
 java {
-    toolchain.languageVersion.set(JavaLanguageVersion.of(8))
+    toolchain.languageVersion.set(JavaLanguageVersion.of(21))
 
     withJavadocJar()
     withSourcesJar()
@@ -25,15 +26,14 @@ repositories {
 }
 
 dependencies {
+    paperweight.paperDevBundle("1.21.11-R0.1-SNAPSHOT")
     implementation("com.charleskorn.kaml:kaml:0.55.0")
     implementation("org.yaml:snakeyaml:2.2")
     implementation("xyz.acrylicstyle.java-util:common:2.0.0-SNAPSHOT")
     implementation("xyz.acrylicstyle.java-util:reflector:2.0.0-SNAPSHOT")
-    implementation("org.mariadb.jdbc:mariadb-java-client:3.5.3")
+//    implementation("org.mariadb.jdbc:mariadb-java-client:4.0.0")
 //    implementation("com.zaxxer:HikariCP:4.0.3")
-    @Suppress("VulnerableLibrariesLocal", "RedundantSuppression")
-    compileOnly("org.spigotmc:spigot-api:1.15.2-R0.1-SNAPSHOT")
-    compileOnly("net.coreprotect:coreprotect:22.2")
+    compileOnly("net.coreprotect:coreprotect:24.1")
     testImplementation(kotlin("test"))
 }
 
@@ -60,11 +60,16 @@ tasks {
         relocate("org.snakeyaml", "net.azisaba.coreprotectextension.lib.org.snakeyaml")
         relocate("org.intellij", "net.azisaba.coreprotectextension.lib.org.intellij")
         relocate("xyz.acrylicstyle.util", "net.azisaba.coreprotectextension.lib.xyz.acrylicstyle.util")
-        relocate("org.mariadb", "net.azisaba.coreprotectextension.lib.org.mariadb")
+//        relocate("org.mariadb", "net.azisaba.coreprotectextension.lib.org.mariadb")
 //        relocate("com.zaxxer", "net.azisaba.coreprotectextension.lib.com.zaxxer")
+        mergeServiceFiles()
+    }
+
+    build {
+        dependsOn(shadowJar)
     }
 }
 
 kotlin {
-    jvmToolchain(8)
+    jvmToolchain(21)
 }
